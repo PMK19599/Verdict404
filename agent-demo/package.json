@@ -1,0 +1,33 @@
+{
+  "name": "agent-demo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.21.0",
+      "onFail": "download"
+    }
+  },
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@algorandfoundation/algokit-utils": "7.0.0-alpha.3",
+    "@x402/avm": "^2.21.0",
+    "@x402/core": "^2.21.0",
+    "@x402/fetch": "^2.21.0",
+    "algosdk": "^3.6.0",
+    "dotenv": "^17.4.2"
+  }
+}

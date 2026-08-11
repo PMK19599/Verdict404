@@ -1,0 +1,34 @@
+{
+  "name": "x402-gateway",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.21.0",
+      "onFail": "download"
+    }
+  },
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.11",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.0",
+    "@x402-avm/extensions": "^2.6.1",
+    "@x402/avm": "^2.21.0",
+    "@x402/core": "^2.21.0",
+    "@x402/hono": "^2.21.0",
+    "dotenv": "^17.4.2",
+    "hono": "^4.13.1"
+  }
+}
