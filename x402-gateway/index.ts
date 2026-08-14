@@ -21,23 +21,27 @@ config();
 
 const avmAddress = process.env.AVM_ADDRESS;
 const facilitatorUrl = process.env.FACILITATOR_URL;
+
 const verifyServiceUrl =
-  process.env.VERIFY_SERVICE_URL || "http://127.0.0.1:8000";
+  process.env.VERIFY_SERVICE_URL ||
+  "http://127.0.0.1:8000";
 
 if (!avmAddress || !facilitatorUrl) {
   console.error(
     "Missing environment variables: AVM_ADDRESS or FACILITATOR_URL"
   );
+
   process.exit(1);
 }
 
-const facilitatorClient = new HTTPFacilitatorClient({
-  url: facilitatorUrl
-});
+const facilitatorClient =
+  new HTTPFacilitatorClient({
+    url: facilitatorUrl
+  });
 
-const resourceServer = new x402ResourceServer(facilitatorClient);
+const resourceServer =
+  new x402ResourceServer(facilitatorClient);
 
-// THIS was the missing part:
 resourceServer.register(
   ALGORAND_TESTNET_CAIP2,
   new ExactAvmScheme()
@@ -49,7 +53,10 @@ app.get("/", (c) => {
   return c.json({
     service: "Verdict404 x402 Gateway",
     status: "running",
-    payment: "x402 enabled"
+    version: "0.2",
+    payment: "x402 enabled",
+    network: "Algorand TestNet",
+    verification_endpoint: "/verify"
   });
 });
 
@@ -68,10 +75,14 @@ app.use(
             }
           }
         ],
-        description: "Independent code verification by Verdict404",
+
+        description:
+          "Independent code verification by Verdict404",
+
         mimeType: "application/json"
       }
     },
+
     resourceServer
   )
 );
@@ -84,26 +95,54 @@ app.post("/verify", async (c) => {
       `${verifyServiceUrl}/run-tests`,
       {
         method: "POST",
+
         headers: {
           "Content-Type": "application/json"
         },
+
         body: JSON.stringify(body)
       }
     );
 
     const result = await response.json();
 
+    if (!response.ok) {
+      c.status(502);
+
+      return c.json({
+        service: "Verdict404",
+        task: body?.task ?? "unknown",
+        language:
+          body?.language?.toLowerCase?.() ??
+          "unknown",
+        verdict: "ERROR",
+        tests_passed: 0,
+        tests_failed: 0,
+        confidence: 0,
+        evidence: [
+          "Verification engine returned an error."
+        ]
+      });
+    }
+
     return c.json(result);
   } catch (error) {
     console.error(error);
 
-    return c.json(
-      {
-        verdict: "ERROR",
-        evidence: "Gateway could not reach verifier"
-      },
-      500
-    );
+    c.status(500);
+
+    return c.json({
+      service: "Verdict404",
+      task: "unknown",
+      language: "unknown",
+      verdict: "ERROR",
+      tests_passed: 0,
+      tests_failed: 0,
+      confidence: 0,
+      evidence: [
+        "Gateway could not reach verification engine."
+      ]
+    });
   }
 });
 

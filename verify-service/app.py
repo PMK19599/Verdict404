@@ -11,11 +11,34 @@ class VerifyRequest(BaseModel):
     code: str
 
 
+def build_response(
+    request: VerifyRequest,
+    verdict: str,
+    tests_passed: int,
+    tests_failed: int,
+    confidence: int,
+    evidence: list[str]
+):
+    return {
+        "service": "Verdict404",
+        "task": request.task,
+        "language": request.language.lower(),
+        "verdict": verdict,
+        "tests_passed": tests_passed,
+        "tests_failed": tests_failed,
+        "confidence": confidence,
+        "evidence": evidence
+    }
+
+
 @app.get("/")
 def health():
     return {
         "service": "Verdict404 Verification Engine",
-        "status": "running"
+        "status": "running",
+        "version": "0.2",
+        "supported_languages": ["python"],
+        "supported_tasks": ["safe_divide"]
     }
 
 
@@ -23,39 +46,37 @@ def health():
 def run_tests(request: VerifyRequest):
 
     if request.language.lower() != "python":
-        return {
-            "verdict": "ERROR",
-            "tests_passed": 0,
-            "tests_failed": 0,
-            "confidence": 0,
-            "evidence": [
-                "Only Python verification is supported in the current MVP."
-            ]
-        }
+        return build_response(
+            request,
+            "ERROR",
+            0,
+            0,
+            0,
+            ["Only Python verification is supported in the current MVP."]
+        )
 
     if request.task != "safe_divide":
-        return {
-            "verdict": "ERROR",
-            "tests_passed": 0,
-            "tests_failed": 0,
-            "confidence": 0,
-            "evidence": [
-                f"Unknown verification task: {request.task}"
-            ]
-        }
+        return build_response(
+            request,
+            "ERROR",
+            0,
+            0,
+            0,
+            [f"Unknown verification task: {request.task}"]
+        )
 
     try:
         tree = ast.parse(request.code)
+
     except SyntaxError as error:
-        return {
-            "verdict": "ERROR",
-            "tests_passed": 0,
-            "tests_failed": 1,
-            "confidence": 100,
-            "evidence": [
-                f"Python syntax error at line {error.lineno}."
-            ]
-        }
+        return build_response(
+            request,
+            "ERROR",
+            0,
+            1,
+            100,
+            [f"Python syntax error at line {error.lineno}."]
+        )
 
     divide_function = None
 
@@ -65,15 +86,14 @@ def run_tests(request: VerifyRequest):
             break
 
     if divide_function is None:
-        return {
-            "verdict": "FAIL",
-            "tests_passed": 0,
-            "tests_failed": 4,
-            "confidence": 100,
-            "evidence": [
-                "Required function 'divide' was not found."
-            ]
-        }
+        return build_response(
+            request,
+            "FAIL",
+            0,
+            4,
+            100,
+            ["Required function 'divide' was not found."]
+        )
 
     tests_passed = 0
     tests_failed = 0
@@ -85,7 +105,9 @@ def run_tests(request: VerifyRequest):
         evidence.append("PASS: divide() accepts two parameters.")
     else:
         tests_failed += 1
-        evidence.append("FAIL: divide() must accept exactly two parameters.")
+        evidence.append(
+            "FAIL: divide() must accept exactly two parameters."
+        )
 
     # Test 2: function must perform division
     has_division = any(
@@ -142,10 +164,11 @@ def run_tests(request: VerifyRequest):
         (tests_passed / (tests_passed + tests_failed)) * 100
     )
 
-    return {
-        "verdict": verdict,
-        "tests_passed": tests_passed,
-        "tests_failed": tests_failed,
-        "confidence": confidence,
-        "evidence": evidence
-    }
+    return build_response(
+        request,
+        verdict,
+        tests_passed,
+        tests_failed,
+        confidence,
+        evidence
+    )
