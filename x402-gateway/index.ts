@@ -1,5 +1,6 @@
 import { config } from "dotenv";
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 
 import {
@@ -37,7 +38,6 @@ const facilitatorClient = new HTTPFacilitatorClient({
 
 const resourceServer = new x402ResourceServer(facilitatorClient);
 
-// THIS was the missing part:
 resourceServer.register(
   ALGORAND_TESTNET_CAIP2,
   new ExactAvmScheme()
@@ -45,11 +45,21 @@ resourceServer.register(
 
 const app = new Hono();
 
+app.use("*", cors({
+  origin: "*",
+  allowMethods: ["GET", "POST", "OPTIONS"],
+  allowHeaders: ["Content-Type", "Authorization", "X-402-Payment", "Payment-Signature", "Payment-Required", "*"],
+  exposeHeaders: ["*"]
+}));
+
 app.get("/", (c) => {
   return c.json({
     service: "Verdict404 x402 Gateway",
     status: "running",
-    payment: "x402 enabled"
+    version: "0.2",
+    payment: "x402 enabled",
+    network: "Algorand TestNet",
+    verification_endpoint: "/verify"
   });
 });
 
