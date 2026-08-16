@@ -53,11 +53,151 @@ app.get("/", (c) => {
   return c.json({
     service: "Verdict404 x402 Gateway",
     status: "running",
-    version: "0.2",
+    version: "0.3",
     payment: "x402 enabled",
     network: "Algorand TestNet",
-    verification_endpoint: "/verify"
+    verification_endpoint: "/verify",
+    supported_tasks: [
+      "safe_divide",
+      "validate_json"
+    ]
   });
+});
+
+/*
+ * Pre-payment validation.
+ *
+ * This runs BEFORE x402 middleware so obviously invalid
+ * requests are rejected without charging the caller.
+ */
+app.use("/verify", async (c, next) => {
+  if (c.req.method !== "POST") {
+    await next();
+    return;
+  }
+
+  let body: Record<string, unknown>;
+
+  try {
+    body = await c.req.raw.clone().json();
+  } catch {
+    c.status(400);
+
+    return c.json({
+      service: "Verdict404",
+      task: "unknown",
+      language: "unknown",
+      verdict: "ERROR",
+      tests_passed: 0,
+      tests_failed: 0,
+      confidence: 0,
+      evidence: [
+        "Request body must contain valid JSON."
+      ]
+    });
+  }
+
+  const task = body.task;
+  const language = body.language;
+  const code = body.code;
+
+  if (
+    typeof task !== "string" ||
+    task.trim() === ""
+  ) {
+    c.status(400);
+
+    return c.json({
+      service: "Verdict404",
+      task: "unknown",
+      language:
+        typeof language === "string"
+          ? language.toLowerCase()
+          : "unknown",
+      verdict: "ERROR",
+      tests_passed: 0,
+      tests_failed: 0,
+      confidence: 0,
+      evidence: [
+        "Field 'task' is required."
+      ]
+    });
+  }
+
+  if (
+    typeof language !== "string" ||
+    language.trim() === ""
+  ) {
+    c.status(400);
+
+    return c.json({
+      service: "Verdict404",
+      task,
+      language: "unknown",
+      verdict: "ERROR",
+      tests_passed: 0,
+      tests_failed: 0,
+      confidence: 0,
+      evidence: [
+        "Field 'language' is required."
+      ]
+    });
+  }
+
+  if (
+    typeof code !== "string" ||
+    code.trim() === ""
+  ) {
+    c.status(400);
+
+    return c.json({
+      service: "Verdict404",
+      task,
+      language: language.toLowerCase(),
+      verdict: "ERROR",
+      tests_passed: 0,
+      tests_failed: 0,
+      confidence: 0,
+      evidence: [
+        "Field 'code' must contain content to verify."
+      ]
+    });
+  }
+
+  const normalizedLanguage =
+    language.toLowerCase();
+
+  const validTaskLanguagePair =
+    (
+      task === "safe_divide" &&
+      normalizedLanguage === "python"
+    ) ||
+    (
+      task === "validate_json" &&
+      normalizedLanguage === "json"
+    );
+
+  if (!validTaskLanguagePair) {
+    c.status(422);
+
+    return c.json({
+      service: "Verdict404",
+      task,
+      language: normalizedLanguage,
+      verdict: "ERROR",
+      tests_passed: 0,
+      tests_failed: 0,
+      confidence: 0,
+      evidence: [
+        (
+          "Unsupported verification task or "
+          + "task/language combination."
+        )
+      ]
+    });
+  }
+
+  await next();
 });
 
 app.use(
@@ -77,7 +217,7 @@ app.use(
         ],
 
         description:
-          "Independent code verification by Verdict404",
+          "Independent verification by Verdict404",
 
         mimeType: "application/json"
       }
@@ -111,10 +251,14 @@ app.post("/verify", async (c) => {
 
       return c.json({
         service: "Verdict404",
-        task: body?.task ?? "unknown",
+        task:
+          typeof body?.task === "string"
+            ? body.task
+            : "unknown",
         language:
-          body?.language?.toLowerCase?.() ??
-          "unknown",
+          typeof body?.language === "string"
+            ? body.language.toLowerCase()
+            : "unknown",
         verdict: "ERROR",
         tests_passed: 0,
         tests_failed: 0,
