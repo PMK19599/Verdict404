@@ -1,6 +1,5 @@
 import { config } from "dotenv";
 import { Hono } from "hono";
-import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 
 import {
@@ -22,21 +21,26 @@ config();
 
 const avmAddress = process.env.AVM_ADDRESS;
 const facilitatorUrl = process.env.FACILITATOR_URL;
+
 const verifyServiceUrl =
-  process.env.VERIFY_SERVICE_URL || "http://127.0.0.1:8000";
+  process.env.VERIFY_SERVICE_URL ||
+  "http://127.0.0.1:8000";
 
 if (!avmAddress || !facilitatorUrl) {
   console.error(
     "Missing environment variables: AVM_ADDRESS or FACILITATOR_URL"
   );
+
   process.exit(1);
 }
 
-const facilitatorClient = new HTTPFacilitatorClient({
-  url: facilitatorUrl
-});
+const facilitatorClient =
+  new HTTPFacilitatorClient({
+    url: facilitatorUrl
+  });
 
-const resourceServer = new x402ResourceServer(facilitatorClient);
+const resourceServer =
+  new x402ResourceServer(facilitatorClient);
 
 resourceServer.register(
   ALGORAND_TESTNET_CAIP2,
@@ -45,22 +49,155 @@ resourceServer.register(
 
 const app = new Hono();
 
-app.use("*", cors({
-  origin: "*",
-  allowMethods: ["GET", "POST", "OPTIONS"],
-  allowHeaders: ["Content-Type", "Authorization", "X-402-Payment", "Payment-Signature", "Payment-Required", "*"],
-  exposeHeaders: ["*"]
-}));
-
 app.get("/", (c) => {
   return c.json({
     service: "Verdict404 x402 Gateway",
     status: "running",
-    version: "0.2",
+    version: "0.3",
     payment: "x402 enabled",
     network: "Algorand TestNet",
-    verification_endpoint: "/verify"
+    verification_endpoint: "/verify",
+    supported_tasks: [
+      "safe_divide",
+      "validate_json"
+    ]
   });
+});
+
+/*
+ * Pre-payment validation.
+ *
+ * This runs BEFORE x402 middleware so obviously invalid
+ * requests are rejected without charging the caller.
+ */
+app.use("/verify", async (c, next) => {
+  if (c.req.method !== "POST") {
+    await next();
+    return;
+  }
+
+  let body: Record<string, unknown>;
+
+  try {
+    body = await c.req.raw.clone().json();
+  } catch {
+    c.status(400);
+
+    return c.json({
+      service: "Verdict404",
+      task: "unknown",
+      language: "unknown",
+      verdict: "ERROR",
+      tests_passed: 0,
+      tests_failed: 0,
+      confidence: 0,
+      evidence: [
+        "Request body must contain valid JSON."
+      ]
+    });
+  }
+
+  const task = body.task;
+  const language = body.language;
+  const code = body.code;
+
+  if (
+    typeof task !== "string" ||
+    task.trim() === ""
+  ) {
+    c.status(400);
+
+    return c.json({
+      service: "Verdict404",
+      task: "unknown",
+      language:
+        typeof language === "string"
+          ? language.toLowerCase()
+          : "unknown",
+      verdict: "ERROR",
+      tests_passed: 0,
+      tests_failed: 0,
+      confidence: 0,
+      evidence: [
+        "Field 'task' is required."
+      ]
+    });
+  }
+
+  if (
+    typeof language !== "string" ||
+    language.trim() === ""
+  ) {
+    c.status(400);
+
+    return c.json({
+      service: "Verdict404",
+      task,
+      language: "unknown",
+      verdict: "ERROR",
+      tests_passed: 0,
+      tests_failed: 0,
+      confidence: 0,
+      evidence: [
+        "Field 'language' is required."
+      ]
+    });
+  }
+
+  if (
+    typeof code !== "string" ||
+    code.trim() === ""
+  ) {
+    c.status(400);
+
+    return c.json({
+      service: "Verdict404",
+      task,
+      language: language.toLowerCase(),
+      verdict: "ERROR",
+      tests_passed: 0,
+      tests_failed: 0,
+      confidence: 0,
+      evidence: [
+        "Field 'code' must contain content to verify."
+      ]
+    });
+  }
+
+  const normalizedLanguage =
+    language.toLowerCase();
+
+  const validTaskLanguagePair =
+    (
+      task === "safe_divide" &&
+      normalizedLanguage === "python"
+    ) ||
+    (
+      task === "validate_json" &&
+      normalizedLanguage === "json"
+    );
+
+  if (!validTaskLanguagePair) {
+    c.status(422);
+
+    return c.json({
+      service: "Verdict404",
+      task,
+      language: normalizedLanguage,
+      verdict: "ERROR",
+      tests_passed: 0,
+      tests_failed: 0,
+      confidence: 0,
+      evidence: [
+        (
+          "Unsupported verification task or "
+          + "task/language combination."
+        )
+      ]
+    });
+  }
+
+  await next();
 });
 
 app.use(
@@ -78,10 +215,14 @@ app.use(
             }
           }
         ],
-        description: "Independent code verification by Verdict404",
+
+        description:
+          "Independent verification by Verdict404",
+
         mimeType: "application/json"
       }
     },
+
     resourceServer
   )
 );
@@ -94,26 +235,58 @@ app.post("/verify", async (c) => {
       `${verifyServiceUrl}/run-tests`,
       {
         method: "POST",
+
         headers: {
           "Content-Type": "application/json"
         },
+
         body: JSON.stringify(body)
       }
     );
 
     const result = await response.json();
 
+    if (!response.ok) {
+      c.status(502);
+
+      return c.json({
+        service: "Verdict404",
+        task:
+          typeof body?.task === "string"
+            ? body.task
+            : "unknown",
+        language:
+          typeof body?.language === "string"
+            ? body.language.toLowerCase()
+            : "unknown",
+        verdict: "ERROR",
+        tests_passed: 0,
+        tests_failed: 0,
+        confidence: 0,
+        evidence: [
+          "Verification engine returned an error."
+        ]
+      });
+    }
+
     return c.json(result);
   } catch (error) {
     console.error(error);
 
-    return c.json(
-      {
-        verdict: "ERROR",
-        evidence: "Gateway could not reach verifier"
-      },
-      500
-    );
+    c.status(500);
+
+    return c.json({
+      service: "Verdict404",
+      task: "unknown",
+      language: "unknown",
+      verdict: "ERROR",
+      tests_passed: 0,
+      tests_failed: 0,
+      confidence: 0,
+      evidence: [
+        "Gateway could not reach verification engine."
+      ]
+    });
   }
 });
 

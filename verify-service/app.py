@@ -1,17 +1,10 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import ast
+import json
 
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 class VerifyRequest(BaseModel):
     task: str
@@ -19,51 +12,71 @@ class VerifyRequest(BaseModel):
     code: str
 
 
+def build_response(
+    request: VerifyRequest,
+    verdict: str,
+    tests_passed: int,
+    tests_failed: int,
+    confidence: int,
+    evidence: list[str]
+):
+    return {
+        "service": "Verdict404",
+        "task": request.task,
+        "language": request.language.lower(),
+        "verdict": verdict,
+        "tests_passed": tests_passed,
+        "tests_failed": tests_failed,
+        "confidence": confidence,
+        "evidence": evidence
+    }
+
+
 @app.get("/")
 def health():
     return {
         "service": "Verdict404 Verification Engine",
-        "status": "running"
+        "status": "running",
+        "version": "0.3",
+        "supported_languages": [
+            "python",
+            "json"
+        ],
+        "supported_tasks": [
+            "safe_divide",
+            "validate_json"
+        ]
     }
 
 
-@app.post("/run-tests")
-def run_tests(request: VerifyRequest):
+def verify_safe_divide(request: VerifyRequest):
 
     if request.language.lower() != "python":
-        return {
-            "verdict": "ERROR",
-            "tests_passed": 0,
-            "tests_failed": 0,
-            "confidence": 0,
-            "evidence": [
-                "Only Python verification is supported in the current MVP."
+        return build_response(
+            request,
+            "ERROR",
+            0,
+            0,
+            0,
+            [
+                "safe_divide requires language 'python'."
             ]
-        }
-
-    if request.task != "safe_divide":
-        return {
-            "verdict": "ERROR",
-            "tests_passed": 0,
-            "tests_failed": 0,
-            "confidence": 0,
-            "evidence": [
-                f"Unknown verification task: {request.task}"
-            ]
-        }
+        )
 
     try:
         tree = ast.parse(request.code)
+
     except SyntaxError as error:
-        return {
-            "verdict": "ERROR",
-            "tests_passed": 0,
-            "tests_failed": 1,
-            "confidence": 100,
-            "evidence": [
+        return build_response(
+            request,
+            "ERROR",
+            0,
+            1,
+            100,
+            [
                 f"Python syntax error at line {error.lineno}."
             ]
-        }
+        )
 
     divide_function = None
 
@@ -73,49 +86,61 @@ def run_tests(request: VerifyRequest):
             break
 
     if divide_function is None:
-        return {
-            "verdict": "FAIL",
-            "tests_passed": 0,
-            "tests_failed": 4,
-            "confidence": 100,
-            "evidence": [
+        return build_response(
+            request,
+            "FAIL",
+            0,
+            4,
+            100,
+            [
                 "Required function 'divide' was not found."
             ]
-        }
+        )
 
     tests_passed = 0
     tests_failed = 0
     evidence = []
 
-    # Test 1: function must accept exactly two parameters
     if len(divide_function.args.args) == 2:
         tests_passed += 1
-        evidence.append("PASS: divide() accepts two parameters.")
+        evidence.append(
+            "PASS: divide() accepts two parameters."
+        )
     else:
         tests_failed += 1
-        evidence.append("FAIL: divide() must accept exactly two parameters.")
+        evidence.append(
+            "FAIL: divide() must accept exactly two parameters."
+        )
 
-    # Test 2: function must perform division
     has_division = any(
-        isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div)
+        isinstance(node, ast.BinOp)
+        and isinstance(node.op, ast.Div)
         for node in ast.walk(divide_function)
     )
 
     if has_division:
         tests_passed += 1
-        evidence.append("PASS: division operation detected.")
+        evidence.append(
+            "PASS: division operation detected."
+        )
     else:
         tests_failed += 1
-        evidence.append("FAIL: no division operation detected.")
+        evidence.append(
+            "FAIL: no division operation detected."
+        )
 
-    # Test 3: code should explicitly check the divisor against zero
     has_zero_guard = False
 
     for node in ast.walk(divide_function):
         if isinstance(node, ast.Compare):
+
             contains_zero = any(
-                isinstance(value, ast.Constant) and value.value == 0
-                for value in [node.left, *node.comparators]
+                isinstance(value, ast.Constant)
+                and value.value == 0
+                for value in [
+                    node.left,
+                    *node.comparators
+                ]
             )
 
             if contains_zero:
@@ -124,14 +149,15 @@ def run_tests(request: VerifyRequest):
 
     if has_zero_guard:
         tests_passed += 1
-        evidence.append("PASS: zero-division guard detected.")
+        evidence.append(
+            "PASS: zero-division guard detected."
+        )
     else:
         tests_failed += 1
         evidence.append(
             "FAIL: no explicit zero-division guard detected."
         )
 
-    # Test 4: function must return a value
     has_return = any(
         isinstance(node, ast.Return)
         for node in ast.walk(divide_function)
@@ -139,21 +165,179 @@ def run_tests(request: VerifyRequest):
 
     if has_return:
         tests_passed += 1
-        evidence.append("PASS: function returns a result.")
+        evidence.append(
+            "PASS: function returns a result."
+        )
     else:
         tests_failed += 1
-        evidence.append("FAIL: function does not return a result.")
+        evidence.append(
+            "FAIL: function does not return a result."
+        )
 
-    verdict = "PASS" if tests_failed == 0 else "FAIL"
-
-    confidence = round(
-        (tests_passed / (tests_passed + tests_failed)) * 100
+    verdict = (
+        "PASS"
+        if tests_failed == 0
+        else "FAIL"
     )
 
-    return {
-        "verdict": verdict,
-        "tests_passed": tests_passed,
-        "tests_failed": tests_failed,
-        "confidence": confidence,
-        "evidence": evidence
-    }
+    confidence = round(
+        (
+            tests_passed
+            / (
+                tests_passed
+                + tests_failed
+            )
+        ) * 100
+    )
+
+    return build_response(
+        request,
+        verdict,
+        tests_passed,
+        tests_failed,
+        confidence,
+        evidence
+    )
+
+
+def verify_json_output(request: VerifyRequest):
+
+    if request.language.lower() != "json":
+        return build_response(
+            request,
+            "ERROR",
+            0,
+            0,
+            0,
+            [
+                "validate_json requires language 'json'."
+            ]
+        )
+
+    try:
+        data = json.loads(request.code)
+
+    except json.JSONDecodeError as error:
+        return build_response(
+            request,
+            "ERROR",
+            0,
+            1,
+            100,
+            [
+                (
+                    "Invalid JSON syntax at "
+                    f"line {error.lineno}, "
+                    f"column {error.colno}."
+                )
+            ]
+        )
+
+    if not isinstance(data, dict):
+        return build_response(
+            request,
+            "FAIL",
+            0,
+            4,
+            100,
+            [
+                "JSON root must be an object."
+            ]
+        )
+
+    tests_passed = 0
+    tests_failed = 0
+    evidence = []
+
+    if "name" in data:
+        tests_passed += 1
+        evidence.append(
+            "PASS: required field 'name' exists."
+        )
+    else:
+        tests_failed += 1
+        evidence.append(
+            "FAIL: required field 'name' is missing."
+        )
+
+    if "age" in data:
+        tests_passed += 1
+        evidence.append(
+            "PASS: required field 'age' exists."
+        )
+    else:
+        tests_failed += 1
+        evidence.append(
+            "FAIL: required field 'age' is missing."
+        )
+
+    if isinstance(data.get("name"), str):
+        tests_passed += 1
+        evidence.append(
+            "PASS: 'name' is a string."
+        )
+    else:
+        tests_failed += 1
+        evidence.append(
+            "FAIL: 'name' must be a string."
+        )
+
+    if (
+        isinstance(data.get("age"), int)
+        and not isinstance(data.get("age"), bool)
+    ):
+        tests_passed += 1
+        evidence.append(
+            "PASS: 'age' is an integer."
+        )
+    else:
+        tests_failed += 1
+        evidence.append(
+            "FAIL: 'age' must be an integer."
+        )
+
+    verdict = (
+        "PASS"
+        if tests_failed == 0
+        else "FAIL"
+    )
+
+    confidence = round(
+        (
+            tests_passed
+            / (
+                tests_passed
+                + tests_failed
+            )
+        ) * 100
+    )
+
+    return build_response(
+        request,
+        verdict,
+        tests_passed,
+        tests_failed,
+        confidence,
+        evidence
+    )
+
+
+@app.post("/run-tests")
+def run_tests(request: VerifyRequest):
+
+    if request.task == "safe_divide":
+        return verify_safe_divide(request)
+
+    if request.task == "validate_json":
+        return verify_json_output(request)
+
+    return build_response(
+        request,
+        "ERROR",
+        0,
+        0,
+        0,
+        [
+            f"Unknown verification task: {request.task}"
+        ]
+    )

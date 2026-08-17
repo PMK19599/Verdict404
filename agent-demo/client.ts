@@ -82,22 +82,6 @@ async function main() {
     response.statusText
   );
 
-  if (response.status === 402) {
-    const paymentRequiredHeader = response.headers.get("payment-required");
-    console.log("\n[x402 Payment Required / Settlement Unfulfilled]");
-    if (paymentRequiredHeader) {
-      try {
-        const decoded = JSON.parse(
-          Buffer.from(paymentRequiredHeader, "base64").toString("utf8")
-        );
-        console.log(JSON.stringify(decoded, null, 2));
-      } catch {
-        console.log(paymentRequiredHeader);
-      }
-    }
-    return;
-  }
-
   const paymentResponse =
     new x402HTTPClient(
       client
