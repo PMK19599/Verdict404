@@ -5,36 +5,82 @@ import {
   VerifyRequest,
   VerifyResponse,
 } from '../types/verdict';
+
 import { executeMockVerification } from './mockVerifier';
 
-// Default gateway URL per API contract (docs/API.md: "Local gateway: http://127.0.0.1:3000")
+import { x402Client } from '@x402/core/client';
+import { ExactAvmScheme } from '@x402/avm/exact/client';
+import type { ClientAvmSigner } from '@x402/avm';
+import { wrapFetchWithPayment } from '@x402/fetch';
+
+
+// ============================================================
+// Gateway configuration
+// ============================================================
+
 export const DEFAULT_GATEWAY_URL =
-  (import.meta as any).env?.VITE_GATEWAY_URL || 'http://127.0.0.1:3000';
+  (import.meta as any).env?.VITE_GATEWAY_URL ||
+  'http://127.0.0.1:3000';
 
 export const DEFAULT_VERIFY_SERVICE_URL =
   (import.meta as any).env?.VITE_VERIFY_SERVICE_URL ||
   'http://127.0.0.1:8000';
 
+const ALGORAND_TESTNET_CAIP2 =
+  'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=';
+
+
+// ============================================================
+// Progress callbacks
+// ============================================================
+
 export interface VerificationProgressCallback {
-  onStateChange: (state: VerificationState, message?: string) => void;
-  onPaymentInfo?: (info: PaymentSimulationInfo) => void;
+  onStateChange: (
+    state: VerificationState,
+    message?: string
+  ) => void;
+
+  onPaymentInfo?: (
+    info: PaymentSimulationInfo
+  ) => void;
 }
 
-/**
- * Service Layer for Verdict404
- * Designed for clean substitution between Mock API mode and live x402 Gateway / FastAPI service.
- */
+
+// ============================================================
+// Verification Service
+// ============================================================
+
 class VerificationService {
-  private gatewayUrl: string = DEFAULT_GATEWAY_URL;
-  private verifyServiceUrl: string = DEFAULT_VERIFY_SERVICE_URL;
-  private isMockMode: boolean = true;
+  private gatewayUrl: string =
+    DEFAULT_GATEWAY_URL;
+
+  private verifyServiceUrl: string =
+    DEFAULT_VERIFY_SERVICE_URL;
+
+  private isMockMode = true;
+
+  /**
+   * Connected Algorand wallet signer.
+   *
+   * Pera/Defly performs the actual signing.
+   * No private key is stored in the frontend.
+   */
+  private avmSigner: ClientAvmSigner | null = null;
+
 
   constructor() {
-    // Enable real verification service when VITE_USE_MOCK=false
-    if ((import.meta as any).env?.VITE_USE_MOCK === 'false') {
+    if (
+      (import.meta as any).env?.VITE_USE_MOCK ===
+      'false'
+    ) {
       this.isMockMode = false;
     }
   }
+
+
+  // ==========================================================
+  // Gateway configuration
+  // ==========================================================
 
   public setGatewayUrl(url: string) {
     this.gatewayUrl = url;
@@ -52,6 +98,11 @@ class VerificationService {
     return this.verifyServiceUrl;
   }
 
+
+  // ==========================================================
+  // Mock mode
+  // ==========================================================
+
   public setMockMode(enabled: boolean) {
     this.isMockMode = enabled;
   }
@@ -60,25 +111,36 @@ class VerificationService {
     return this.isMockMode;
   }
 
-  /**
-   * Fetch Gateway Health (GET /)
-   * Matches docs/API.md contract:
-   * {
-   *   "service": "Verdict404 x402 Gateway",
-   *   "status": "running",
-   *   "version": "0.2",
-   *   "payment": "x402 enabled",
-   *   "network": "Algorand TestNet",
-   *   "verification_endpoint": "/verify"
-   * }
-   */
-  public async getGatewayHealth(): Promise<GatewayHealth> {
+
+  // ==========================================================
+  // Wallet signer
+  // ==========================================================
+
+  public setAvmSigner(
+    signer: ClientAvmSigner | null
+  ) {
+    this.avmSigner = signer;
+  }
+
+  public getAvmSigner():
+    ClientAvmSigner | null {
+    return this.avmSigner;
+  }
+
+
+  // ==========================================================
+  // Gateway health
+  // ==========================================================
+
+  public async getGatewayHealth():
+    Promise<GatewayHealth> {
+
     if (this.isMockMode) {
-      // Return authoritative mock response matching API contract
       return {
-        service: 'Verdict404 x402 Gateway',
+        service:
+          'Verdict404 x402 Gateway',
         status: 'running',
-        version: '0.2',
+        version: '0.3',
         payment: 'x402 enabled',
         network: 'Algorand TestNet',
         verification_endpoint: '/verify',
@@ -86,292 +148,193 @@ class VerificationService {
     }
 
     try {
-      const response = await fetch(`${this.gatewayUrl}/`, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-      });
+      const response = await fetch(
+        `${this.gatewayUrl}/`,
+        {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+        }
+      );
+
       if (!response.ok) {
-        throw new Error(`Gateway returned HTTP ${response.status}`);
+        throw new Error(
+          `Gateway returned HTTP ${response.status}`
+        );
       }
+
       return await response.json();
+
     } catch (err: any) {
-      throw new Error(`Failed to reach gateway at ${this.gatewayUrl}: ${err?.message || err}`);
+      throw new Error(
+        `Failed to reach gateway at ${this.gatewayUrl}: ${
+          err?.message || err
+        }`
+      );
     }
   }
 
-  /**
-   * Run verification through the 9-stage verification state machine.
-   *
-   * @param request The standard VerifyRequest ({ task, language, code })
-   * @param callbacks Hook to observe the state transitions
-   */
+
+  // ==========================================================
+  // Verification entry point
+  // ==========================================================
+
   public async verify(
     request: VerifyRequest,
     callbacks: VerificationProgressCallback
   ): Promise<VerifyResponse> {
+
     if (this.isMockMode) {
-      return this.runMockVerificationFlow(request, callbacks);
-    } else {
-      return this.runRealVerificationFlow(request, callbacks);
+      return this.runMockVerificationFlow(
+        request,
+        callbacks
+      );
     }
+
+    return this.runRealGatewayVerification(
+      request,
+      callbacks
+    );
   }
 
-  /**
-   * Mock verification flow simulating the exact x402 payment & verification pipeline.
-   */
+
+  // ==========================================================
+  // Mock verification
+  // ==========================================================
+
   private async runMockVerificationFlow(
     request: VerifyRequest,
     callbacks: VerificationProgressCallback
   ): Promise<VerifyResponse> {
-    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    // 1. REQUESTING: Initial submission to /verify
-    callbacks.onStateChange('REQUESTING', 'Submitting code to Verdict404 verification endpoint...');
+    const sleep = (ms: number) =>
+      new Promise(resolve =>
+        setTimeout(resolve, ms)
+      );
+
+
+    callbacks.onStateChange(
+      'REQUESTING',
+      'Submitting code to Verdict404 verification endpoint...'
+    );
+
     await sleep(400);
 
-    // 2. PAYMENT_REQUIRED: Gateway responds with HTTP 402 Payment Required (Simulated)
+
     callbacks.onStateChange(
       'PAYMENT_REQUIRED',
       '[SIMULATION] HTTP 402: Payment Required. 0.01 USDC verification fee required.'
     );
-    if (callbacks.onPaymentInfo) {
-      callbacks.onPaymentInfo({
-        amount: '0.01',
-        asset: 'USDC (Simulated)',
-        network: 'Algorand TestNet',
-        protocol: 'x402 Micropayment Protocol (Simulated)',
-        status: 'REQUIRED',
-      });
-    }
+
+    callbacks.onPaymentInfo?.({
+      amount: '0.01',
+      asset: 'USDC (Simulated)',
+      network: 'Algorand TestNet',
+      protocol:
+        'x402 Micropayment Protocol (Simulated)',
+      status: 'REQUIRED',
+    });
+
     await sleep(550);
 
-    // 3. PAYING: Simulated micropayment progression
-    callbacks.onStateChange('PAYING', '[SIMULATION] Broadcasting 0.01 USDC micropayment via x402 on Algorand...');
-    if (callbacks.onPaymentInfo) {
-      callbacks.onPaymentInfo({
-        amount: '0.01',
-        asset: 'USDC (Simulated)',
-        network: 'Algorand TestNet',
-        protocol: 'x402 Micropayment Protocol (Simulated)',
-        status: 'SETTLING',
-      });
-    }
+
+    callbacks.onStateChange(
+      'PAYING',
+      '[SIMULATION] Broadcasting 0.01 USDC micropayment via x402 on Algorand...'
+    );
+
+    callbacks.onPaymentInfo?.({
+      amount: '0.01',
+      asset: 'USDC (Simulated)',
+      network: 'Algorand TestNet',
+      protocol:
+        'x402 Micropayment Protocol (Simulated)',
+      status: 'SETTLING',
+    });
+
     await sleep(700);
 
-    // Generate simulated Algorand transaction identifier
-    const randomTx = Array.from({ length: 52 }, () =>
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'.charAt(Math.floor(Math.random() * 32))
-    ).join('');
 
-    // 4. PAYMENT_SETTLED: Simulated settlement
-    callbacks.onStateChange('PAYMENT_SETTLED', '[SIMULATION] Payment Settled on Algorand TestNet.');
-    if (callbacks.onPaymentInfo) {
-      callbacks.onPaymentInfo({
-        amount: '0.01',
-        asset: 'USDC (Simulated)',
-        network: 'Algorand TestNet',
-        protocol: 'x402 Micropayment Protocol (Simulated)',
-        status: 'SETTLED',
-        txHash: `SIMULATED_TX_${randomTx.substring(0, 16)}...`,
-        settledAt: new Date().toLocaleTimeString(),
-      });
-    }
+    const randomTx =
+      Array.from(
+        { length: 52 },
+        () =>
+          'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+            .charAt(
+              Math.floor(
+                Math.random() * 32
+              )
+            )
+      ).join('');
+
+
+    callbacks.onStateChange(
+      'PAYMENT_SETTLED',
+      '[SIMULATION] Payment Settled on Algorand TestNet.'
+    );
+
+    callbacks.onPaymentInfo?.({
+      amount: '0.01',
+      asset: 'USDC (Simulated)',
+      network: 'Algorand TestNet',
+      protocol:
+        'x402 Micropayment Protocol (Simulated)',
+      status: 'SETTLED',
+      txHash:
+        `SIMULATED_TX_${randomTx.substring(0, 16)}...`,
+      settledAt:
+        new Date().toLocaleTimeString(),
+    });
+
     await sleep(450);
 
-    // 5. VERIFYING: Verification engine running safety checks
-    callbacks.onStateChange('VERIFYING', 'Running independent invariant checks & AST analysis...');
+
+    callbacks.onStateChange(
+      'VERIFYING',
+      'Running independent invariant checks & AST analysis...'
+    );
+
     await sleep(650);
 
-    // 6. RESULT: Compute result
-    const result = executeMockVerification(request);
 
-    // Update final state to PASS, FAIL, or ERROR
-    callbacks.onStateChange(result.verdict, `Verification completed with verdict: ${result.verdict}`);
+    const result =
+      executeMockVerification(request);
+
+    callbacks.onStateChange(
+      result.verdict,
+      `Verification completed with verdict: ${result.verdict}`
+    );
+
     return result;
   }
 
-  /**
-   * Real verification flow calling the FastAPI verification service (POST /run-tests).
-   * Preserves full UI progression callbacks with simulated x402 payment indicators.
-   */
-  private async runRealVerificationFlow(
-    request: VerifyRequest,
-    callbacks: VerificationProgressCallback
-  ): Promise<VerifyResponse> {
-    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    // 1. REQUESTING
-    callbacks.onStateChange('REQUESTING', 'Submitting code to verification endpoint...');
-    await sleep(300);
+  // ==========================================================
+  // Real x402 + Algorand verification
+  // ==========================================================
 
-    // 2. PAYMENT_REQUIRED (Simulated)
-    callbacks.onStateChange(
-      'PAYMENT_REQUIRED',
-      '[SIMULATION] HTTP 402: Payment Required. 0.01 USDC verification fee.'
-    );
-    if (callbacks.onPaymentInfo) {
-      callbacks.onPaymentInfo({
-        amount: '0.01',
-        asset: 'USDC (Simulated)',
-        network: 'Algorand TestNet',
-        protocol: 'x402 Micropayment Protocol (Simulated)',
-        status: 'REQUIRED',
-      });
-    }
-    await sleep(350);
-
-    // 3. PAYING (Simulated)
-    callbacks.onStateChange('PAYING', '[SIMULATION] Broadcasting 0.01 USDC micropayment via x402 on Algorand...');
-    if (callbacks.onPaymentInfo) {
-      callbacks.onPaymentInfo({
-        amount: '0.01',
-        asset: 'USDC (Simulated)',
-        network: 'Algorand TestNet',
-        protocol: 'x402 Micropayment Protocol (Simulated)',
-        status: 'SETTLING',
-      });
-    }
-    await sleep(450);
-
-    const randomTx = Array.from({ length: 52 }, () =>
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'.charAt(Math.floor(Math.random() * 32))
-    ).join('');
-
-    // 4. PAYMENT_SETTLED (Simulated)
-    callbacks.onStateChange('PAYMENT_SETTLED', '[SIMULATION] Payment Settled on Algorand TestNet.');
-    if (callbacks.onPaymentInfo) {
-      callbacks.onPaymentInfo({
-        amount: '0.01',
-        asset: 'USDC (Simulated)',
-        network: 'Algorand TestNet',
-        protocol: 'x402 Micropayment Protocol (Simulated)',
-        status: 'SETTLED',
-        txHash: `SIMULATED_TX_${randomTx.substring(0, 16)}...`,
-        settledAt: new Date().toLocaleTimeString(),
-      });
-    }
-    await sleep(300);
-
-    // 5. VERIFYING: Calling real FastAPI service at /run-tests
-    callbacks.onStateChange('VERIFYING', `Connecting to FastAPI verification engine at ${this.verifyServiceUrl}/run-tests...`);
-
-    try {
-      const response = await fetch(`${this.verifyServiceUrl}/run-tests`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          task: request.task,
-          language: request.language,
-          code: request.code,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        callbacks.onStateChange('ERROR', `FastAPI backend error HTTP ${response.status}`);
-        return {
-          service: 'Verdict404',
-          task: request.task,
-          language: request.language,
-          verdict: 'ERROR',
-          tests_passed: 0,
-          tests_failed: 0,
-          confidence: 0,
-          evidence: [`Backend verification error HTTP ${response.status}: ${errorText}`],
-          error: errorText,
-        };
-      }
-
-      const data = await response.json();
-
-      const result: VerifyResponse = {
-        service: 'Verdict404',
-        task: request.task,
-        language: request.language,
-        verdict: data.verdict,
-        tests_passed: data.tests_passed ?? 0,
-        tests_failed: data.tests_failed ?? 0,
-        confidence: data.confidence ?? 0,
-        evidence: data.evidence ?? [],
-      };
-
-      callbacks.onStateChange(result.verdict, `Verification completed with verdict: ${result.verdict}`);
-      return result;
-    } catch (err: any) {
-      callbacks.onStateChange('ERROR', `Failed to connect to verification service: ${err?.message || err}`);
-      return {
-        service: 'Verdict404',
-        task: request.task,
-        language: request.language,
-        verdict: 'ERROR',
-        tests_passed: 0,
-        tests_failed: 0,
-        confidence: 0,
-        evidence: [`Connection error reaching ${this.verifyServiceUrl}/run-tests: ${err?.message || err}`],
-        error: err?.message || 'Verification service unreachable',
-      };
-    }
-  }
-
-  /**
-   * Real gateway verification call (POST /verify).
-   * Note: The gateway handles the 402 challenge and x402 payment settlement.
-   * Signing credentials are NEVER held in the browser.
-   */
   public async runRealGatewayVerification(
     request: VerifyRequest,
     callbacks: VerificationProgressCallback
   ): Promise<VerifyResponse> {
-    callbacks.onStateChange('REQUESTING', `Connecting to gateway at ${this.gatewayUrl}/verify...`);
 
-    try {
-      callbacks.onStateChange('PAYMENT_REQUIRED', 'Gateway returned HTTP 402. Resolving x402...');
-      callbacks.onStateChange('PAYING', 'Processing x402 micropayment with gateway facilitator...');
+    callbacks.onStateChange(
+      'REQUESTING',
+      `Connecting to gateway at ${this.gatewayUrl}/verify...`
+    );
 
-      const response = await fetch(`${this.gatewayUrl}/verify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(request),
-      });
 
-      if (response.status === 402) {
-        callbacks.onStateChange(
-          'PAYMENT_REQUIRED',
-          'HTTP 402 Payment Required: Please ensure gateway facilitator is configured.'
-        );
-        throw new Error('HTTP 402: Payment required by gateway.');
-      }
+    if (!this.avmSigner) {
 
-      callbacks.onStateChange('PAYMENT_SETTLED', 'Gateway payment settled. Executing verification...');
-      callbacks.onStateChange('VERIFYING', 'Verification engine evaluating response...');
+      const message =
+        'No Algorand wallet is connected. Connect Pera or Defly before paying.';
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        callbacks.onStateChange('ERROR', `Gateway error: HTTP ${response.status}`);
-        return {
-          service: 'Verdict404',
-          task: request.task,
-          language: request.language,
-          verdict: 'ERROR',
-          tests_passed: 0,
-          tests_failed: 0,
-          confidence: 0,
-          evidence: [`Gateway returned error ${response.status}: ${errorText}`],
-          error: errorText,
-        };
-      }
+      callbacks.onStateChange(
+        'ERROR',
+        message
+      );
 
-      const data: VerifyResponse = await response.json();
-      callbacks.onStateChange(data.verdict, `Verdict received: ${data.verdict}`);
-      return data;
-    } catch (err: any) {
-      callbacks.onStateChange('ERROR', `Network/Gateway error: ${err?.message || err}`);
       return {
         service: 'Verdict404',
         task: request.task,
@@ -380,11 +343,234 @@ class VerificationService {
         tests_passed: 0,
         tests_failed: 0,
         confidence: 0,
-        evidence: [`Gateway Connection Error: ${err?.message || err}`],
-        error: err?.message || 'Connection error',
+        evidence: [message],
+        error: message,
+      };
+    }
+
+
+    try {
+
+      // --------------------------------------------------------
+      // Create x402 client
+      // --------------------------------------------------------
+
+      const client =
+        new x402Client();
+
+
+      // --------------------------------------------------------
+      // Register Algorand Exact payment scheme
+      // --------------------------------------------------------
+
+      client.register(
+        ALGORAND_TESTNET_CAIP2,
+        new ExactAvmScheme(
+          this.avmSigner
+        )
+      );
+
+
+      // --------------------------------------------------------
+      // Wrap fetch with x402 payment handling
+      // --------------------------------------------------------
+
+      const fetchWithPayment =
+        wrapFetchWithPayment(
+          fetch,
+          client
+        );
+
+
+      callbacks.onStateChange(
+        'PAYMENT_REQUIRED',
+        'Ready for x402 payment. Preparing 0.01 USDC payment...'
+      );
+
+      callbacks.onPaymentInfo?.({
+        amount: '0.01',
+        asset: 'USDC',
+        network: 'Algorand TestNet',
+        protocol:
+          'x402 Micropayment Protocol',
+        status: 'REQUIRED',
+      });
+
+
+      callbacks.onStateChange(
+        'PAYING',
+        'Waiting for wallet approval and signing the Algorand payment...'
+      );
+
+      callbacks.onPaymentInfo?.({
+        amount: '0.01',
+        asset: 'USDC',
+        network: 'Algorand TestNet',
+        protocol:
+          'x402 Micropayment Protocol',
+        status: 'SETTLING',
+      });
+
+
+      // --------------------------------------------------------
+      // x402 handles:
+      //
+      // 1. POST /verify
+      // 2. Receive HTTP 402
+      // 3. Read payment requirements
+      // 4. Build Algorand USDC transaction
+      // 5. Ask Pera / Defly to sign
+      // 6. Attach X-PAYMENT
+      // 7. Retry /verify
+      // 8. Receive paid response
+      // --------------------------------------------------------
+
+      const response =
+        await fetchWithPayment(
+          `${this.gatewayUrl}/verify`,
+          {
+            method: 'POST',
+
+            headers: {
+              'Content-Type':
+                'application/json',
+
+              Accept:
+                'application/json',
+            },
+
+            body:
+              JSON.stringify(request),
+          }
+        );
+
+
+      // --------------------------------------------------------
+      // Payment failed
+      // --------------------------------------------------------
+
+      if (response.status === 402) {
+
+        const errorText =
+          await response.text();
+
+        callbacks.onStateChange(
+          'ERROR',
+          `HTTP 402 Payment Required: ${errorText}`
+        );
+
+        return {
+          service: 'Verdict404',
+          task: request.task,
+          language: request.language,
+          verdict: 'ERROR',
+          tests_passed: 0,
+          tests_failed: 0,
+          confidence: 0,
+          evidence: [
+            'x402 payment could not be completed.',
+            errorText,
+          ],
+          error:
+            'HTTP 402: Payment required.',
+        };
+      }
+
+
+      callbacks.onStateChange(
+        'PAYMENT_SETTLED',
+        'x402 payment settled. Executing verification...'
+      );
+
+
+      callbacks.onStateChange(
+        'VERIFYING',
+        'Verification engine evaluating submitted code...'
+      );
+
+
+      if (!response.ok) {
+
+        const errorText =
+          await response.text();
+
+        callbacks.onStateChange(
+          'ERROR',
+          `Gateway error: HTTP ${response.status}`
+        );
+
+        return {
+          service: 'Verdict404',
+          task: request.task,
+          language: request.language,
+          verdict: 'ERROR',
+          tests_passed: 0,
+          tests_failed: 0,
+          confidence: 0,
+          evidence: [
+            `Gateway returned error ${response.status}: ${errorText}`,
+          ],
+          error: errorText,
+        };
+      }
+
+
+      const data:
+        VerifyResponse =
+        await response.json();
+
+
+      callbacks.onStateChange(
+        data.verdict,
+        `Verdict received: ${data.verdict}`
+      );
+
+      callbacks.onPaymentInfo?.({
+        amount: '0.01',
+        asset: 'USDC',
+        network: 'Algorand TestNet',
+        protocol:
+          'x402 Micropayment Protocol',
+        status: 'SETTLED',
+        settledAt:
+          new Date().toLocaleTimeString(),
+      });
+
+      return data;
+
+
+    } catch (err: any) {
+
+      console.error(
+        'Verdict404 x402 verification error:',
+        err
+      );
+
+      const message =
+        err?.message || String(err);
+
+      callbacks.onStateChange(
+        'ERROR',
+        `Network/Gateway error: ${message}`
+      );
+
+      return {
+        service: 'Verdict404',
+        task: request.task,
+        language: request.language,
+        verdict: 'ERROR',
+        tests_passed: 0,
+        tests_failed: 0,
+        confidence: 0,
+        evidence: [
+          `Gateway Connection Error: ${message}`,
+        ],
+        error: message,
       };
     }
   }
 }
 
-export const verificationService = new VerificationService();
+
+export const verificationService =
+  new VerificationService();

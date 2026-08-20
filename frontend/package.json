@@ -9,7 +9,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@blockshake/defly-connect": "^1.2.1",
+    "@perawallet/connect": "^1.6.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@txnlab/use-wallet": "^5.0.0",
+    "@txnlab/use-wallet-defly": "^5.0.0",
+    "@txnlab/use-wallet-pera": "^5.0.0",
+    "@txnlab/use-wallet-react": "^5.0.0",
+    "@x402/avm": "^2.22.0",
+    "@x402/core": "^2.22.0",
+    "@x402/fetch": "^2.22.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.16.0",
     "react": "^19.0.0",

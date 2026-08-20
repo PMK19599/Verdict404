@@ -49,6 +49,42 @@ resourceServer.register(
 
 const app = new Hono();
 
+// CORS / browser preflight support.
+// Must run before x402 payment middleware so OPTIONS /verify
+// is answered without requiring a payment.
+app.use('*', async (c, next) => {
+  const origin = c.req.header('Origin');
+
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173'
+  ];
+
+  if (origin && allowedOrigins.includes(origin)) {
+    c.header('Access-Control-Allow-Origin', origin);
+    c.header('Vary', 'Origin');
+    c.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+
+    const requestedHeaders =
+      c.req.header('Access-Control-Request-Headers');
+
+    c.header(
+      'Access-Control-Allow-Headers',
+      requestedHeaders ||
+        'Content-Type, X-PAYMENT, X-PAYMENT-RESPONSE, PAYMENT-SIGNATURE'
+    );
+
+    c.header('Access-Control-Max-Age', '86400');
+    c.header('Access-Control-Expose-Headers', 'PAYMENT-REQUIRED, PAYMENT-RESPONSE, X-PAYMENT, X-PAYMENT-RESPONSE');
+  }
+
+  if (c.req.method === 'OPTIONS') {
+    return c.body(null, 204);
+  }
+
+  await next();
+});
+
 app.get("/", (c) => {
   return c.json({
     service: "Verdict404 x402 Gateway",
@@ -298,3 +334,5 @@ serve({
 console.log(
   "Verdict404 x402 gateway running on http://127.0.0.1:3000"
 );
+
+
