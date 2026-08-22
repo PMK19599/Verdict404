@@ -20,11 +20,11 @@ import { wrapFetchWithPayment } from '@x402/fetch';
 
 export const DEFAULT_GATEWAY_URL =
   (import.meta as any).env?.VITE_GATEWAY_URL ||
-  'http://127.0.0.1:3000';
+  'https://verdict404-gateway.onrender.com';
 
 export const DEFAULT_VERIFY_SERVICE_URL =
   (import.meta as any).env?.VITE_VERIFY_SERVICE_URL ||
-  'http://127.0.0.1:8000';
+  'https://verdict404-verify.onrender.com';
 
 const ALGORAND_TESTNET_CAIP2 =
   'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=';
@@ -574,3 +574,4 @@ class VerificationService {
 
 export const verificationService =
   new VerificationService();
+
