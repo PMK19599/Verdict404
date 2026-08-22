@@ -57,7 +57,8 @@ app.use('*', async (c, next) => {
 
   const allowedOrigins = [
     'http://localhost:5173',
-    'http://127.0.0.1:5173'
+    'http://127.0.0.1:5173',
+    'https://verdict404.vercel.app'
   ];
 
   if (origin && allowedOrigins.includes(origin)) {
