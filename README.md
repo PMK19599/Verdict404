@@ -90,7 +90,7 @@ Evidence Trace
 
 # What We Built
 
-Verdict404 currently provides a working paid verification gateway with **two deterministic verification targets**:
+Verdict404 currently provides a working paid verification gateway with **three deterministic verification targets*:
 
 1. `safe_divide` — Python code verification
 2. `validate_json` — structured JSON verification
@@ -99,7 +99,9 @@ The purpose of having two targets is important.
 
 We are **not building a product that only checks one `divide()` function**.
 
-`safe_divide` demonstrates independent verification of generated code, while `validate_json` demonstrates that the same verification infrastructure can also validate structured outputs.
+1. safe_divide — Python code verification
+2. validate_json — structured JSON verification
+3. agent_action — autonomous action verification
 
 The underlying architecture can therefore support additional verification modules later.
 
