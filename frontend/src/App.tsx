@@ -19,7 +19,7 @@ import { verificationService } from './services/api';
 import { ShieldCheck, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 
 export const App: React.FC = () => {
-  // State
+  // State — unchanged from original
   const [selectedTask, setSelectedTask] = useState<TaskType>('safe_divide');
   const [code, setCode] = useState<string>(TASK_CONFIGS.safe_divide.defaultCode);
   const [verificationState, setVerificationState] = useState<VerificationState>('IDLE');
@@ -31,7 +31,7 @@ export const App: React.FC = () => {
   const [isArchitectureOpen, setIsArchitectureOpen] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Initialize & fetch Gateway health on mount
+  // Initialize & fetch Gateway health on mount — unchanged
   useEffect(() => {
     fetchHealth();
   }, [isMockMode]);
@@ -46,20 +46,20 @@ export const App: React.FC = () => {
     }
   };
 
-  // Handle task change
+  // Handle task change — unchanged
   const handleTaskChange = (newTask: TaskType) => {
     setSelectedTask(newTask);
     setCode(TASK_CONFIGS[newTask].defaultCode);
     handleReset();
   };
 
-  // Handle quick preset selection
+  // Handle quick preset selection — unchanged
   const handleSelectPreset = (preset: PresetItem) => {
     setCode(preset.code);
     handleReset();
   };
 
-  // Reset to initial IDLE state
+  // Reset to initial IDLE state — unchanged
   const handleReset = () => {
     setVerificationState('IDLE');
     setStatusMessage('Ready to verify code with x402.');
@@ -68,14 +68,14 @@ export const App: React.FC = () => {
     setErrorMessage(null);
   };
 
-  // Toggle mock sandbox mode
+  // Toggle mock sandbox mode — unchanged
   const handleToggleMock = (enabled: boolean) => {
     setIsMockMode(enabled);
     verificationService.setMockMode(enabled);
     handleReset();
   };
 
-  // Run verification
+  // Run verification — unchanged
   const handleVerify = async () => {
     if (!code.trim()) {
       setErrorMessage('Please enter or select code to verify.');
@@ -119,8 +119,9 @@ export const App: React.FC = () => {
     verificationState === 'VERIFYING';
 
   return (
-    <div className="min-h-screen bg-navy-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500/20 selection:text-cyan-200">
-      {/* Top Header */}
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500/20 selection:text-cyan-200">
+
+      {/* Header */}
       <Header
         health={gatewayHealth}
         isMockMode={isMockMode}
@@ -128,31 +129,27 @@ export const App: React.FC = () => {
         onOpenArchitecture={() => setIsArchitectureOpen(true)}
       />
 
-      {/* Hero Section */}
+      {/* Hero */}
       <Hero />
 
       {/* Main Verification Workspace */}
-      <main className="flex-1 mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-8">
-        {/* Workspace Grid */}
+      <main className="flex-1 mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column (Inputs, Task, Editor) - 7 Cols */}
-          <div className="lg:col-span-7 space-y-6">
-            {/* Step 1: Task Selection */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-cyan-500/20 text-cyan-400 font-mono text-xs font-bold">
-                    1
-                  </span>
-                  <h2 className="font-bold text-base sm:text-lg text-white">
-                    Select Verification Target
-                  </h2>
-                </div>
-                <span className="text-xs text-slate-400 font-mono">
-                  {selectedTask === 'safe_divide' ? 'safe_divide (Python)' : 'validate_json (JSON)'}
+
+          {/* ── Left Column (Inputs) — 7 cols ── */}
+          <div className="lg:col-span-7 space-y-7">
+
+            {/* Step 01 — Target Selection */}
+            <div className="space-y-2">
+              <div className="flex items-baseline gap-2 border-b border-slate-800 pb-2">
+                <span className="font-mono text-[10px] text-slate-600 select-none">01</span>
+                <h2 className="font-mono text-xs font-semibold uppercase tracking-widest text-slate-400">
+                  Select Verification Target
+                </h2>
+                <span className="ml-auto font-mono text-[10px] text-slate-600">
+                  {selectedTask === 'safe_divide' ? 'safe_divide · Python' : 'validate_json · JSON'}
                 </span>
               </div>
-
               <TaskSelector
                 selectedTask={selectedTask}
                 onSelectTask={handleTaskChange}
@@ -161,28 +158,23 @@ export const App: React.FC = () => {
               />
             </div>
 
-            {/* Step 2: Code Editor */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-cyan-500/20 text-cyan-400 font-mono text-xs font-bold">
-                    2
-                  </span>
-                  <h2 className="font-bold text-base sm:text-lg text-white">
-                    Autonomous Code / Payload Input
-                  </h2>
-                </div>
+            {/* Step 02 — Code / Payload Editor */}
+            <div className="space-y-2">
+              <div className="flex items-baseline gap-2 border-b border-slate-800 pb-2">
+                <span className="font-mono text-[10px] text-slate-600 select-none">02</span>
+                <h2 className="font-mono text-xs font-semibold uppercase tracking-widest text-slate-400">
+                  Code / Payload Input
+                </h2>
                 <button
                   type="button"
                   disabled={isProcessing}
                   onClick={() => setCode(TASK_CONFIGS[selectedTask].defaultCode)}
-                  className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 font-mono transition disabled:opacity-50"
+                  className="ml-auto flex items-center gap-1 font-mono text-[10px] text-slate-600 hover:text-slate-400 transition disabled:opacity-40"
                 >
-                  <RefreshCw className="h-3 w-3" />
-                  <span>Restore Default</span>
+                  <RefreshCw className="h-2.5 w-2.5" />
+                  Restore Default
                 </button>
               </div>
-
               <CodeEditor
                 task={selectedTask}
                 code={code}
@@ -191,46 +183,49 @@ export const App: React.FC = () => {
               />
             </div>
 
-            {/* Step 3: Action & x402 Payment Bar */}
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 shadow-xl backdrop-blur-md">
+            {/* Step 03 — Verify Action Bar */}
+            <div className="border-t border-slate-800 pt-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
-                    <span className="h-2 w-2 rounded-full bg-cyan-400"></span>
-                    <span>
-                      Verification Fee:{' '}
-                      <strong className="text-white font-semibold">0.01 USDC</strong>
-                    </span>
+
+                {/* Fee info */}
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2 font-mono text-xs text-slate-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-cyan-500"></span>
+                    Verification Fee:{' '}
+                    <strong className="text-white">0.01 USDC</strong>
                   </div>
-                  <div className="text-[11px] text-slate-500 font-mono">
-                    Protocol: x402 on Algorand TestNet · Endpoint: <code className="text-slate-400">/verify</code>
+                  <div className="font-mono text-[10px] text-slate-600 pl-3.5">
+                    Protocol: x402 · Network: Algorand TestNet · Endpoint:{' '}
+                    <code className="text-slate-500">POST /verify</code>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                {/* Action buttons */}
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     disabled={isProcessing}
                     onClick={handleReset}
-                    className="rounded-xl border border-slate-700 bg-slate-800/80 px-3.5 py-3 text-xs font-mono font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition disabled:opacity-50"
+                    className="rounded border border-slate-800 bg-slate-900 px-4 py-2 font-mono text-xs text-slate-400 hover:border-slate-700 hover:text-slate-200 transition disabled:opacity-40"
                   >
                     Reset
                   </button>
 
                   <button
+                    id="btn-verify-x402"
                     type="button"
                     disabled={isProcessing || !code.trim()}
                     onClick={handleVerify}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 px-6 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/25 hover:from-cyan-400 hover:to-blue-500 hover:shadow-cyan-500/40 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
+                    className="btn-verify"
                   >
                     {isProcessing ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin text-slate-950" />
-                        <span>Verifying with x402...</span>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Verifying...</span>
                       </>
                     ) : (
                       <>
-                        <ShieldCheck className="h-4 w-4" />
+                        <ShieldCheck className="h-3.5 w-3.5" />
                         <span>Verify with x402</span>
                       </>
                     )}
@@ -238,18 +233,21 @@ export const App: React.FC = () => {
                 </div>
               </div>
 
+              {/* Error message */}
               {errorMessage && (
-                <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-500/40 bg-rose-950/30 p-2.5 text-xs text-rose-300 font-mono">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+                <div className="mt-3 flex items-center gap-2 rounded border border-red-900/50 bg-red-950/30 px-3 py-2 font-mono text-xs text-red-300">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" />
                   <span>{errorMessage}</span>
                 </div>
               )}
             </div>
+
           </div>
 
-          {/* Right Column (Pipeline State & Result View) - 5 Cols */}
-          <div className="lg:col-span-5 space-y-6">
-            {/* Verification Pipeline Tracker */}
+          {/* ── Right Column (Pipeline + Result) — 5 cols ── */}
+          <div className="lg:col-span-5 space-y-5">
+
+            {/* Verification Pipeline */}
             <VerificationPipeline
               state={verificationState}
               statusMessage={statusMessage}
@@ -257,7 +255,7 @@ export const App: React.FC = () => {
               finalVerdict={result?.verdict}
             />
 
-            {/* Verdict Result Display */}
+            {/* Result view or idle placeholder */}
             {result ? (
               <ResultView
                 result={result}
@@ -266,44 +264,44 @@ export const App: React.FC = () => {
                 onRetry={handleVerify}
               />
             ) : (
-              /* Idle state card placeholder */
-              <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 p-8 text-center space-y-3">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 border border-slate-800 text-slate-500">
-                  <ShieldCheck className="h-6 w-6" />
+              <div className="border border-dashed border-slate-800 rounded p-8 text-center space-y-2.5">
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded border border-slate-800 bg-slate-900 text-slate-600">
+                  <ShieldCheck className="h-5 w-5" />
                 </div>
-                <h3 className="font-mono text-sm font-semibold text-slate-300">
+                <p className="font-mono text-xs font-semibold text-slate-500">
                   Awaiting Verification Request
-                </h3>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                  Select a verifier task above or click <strong className="text-slate-400">Verify with x402</strong> to
-                  initiate the 402 payment challenge and receive an independent verdict.
+                </p>
+                <p className="text-[11px] text-slate-600 max-w-xs mx-auto leading-relaxed">
+                  Select a target and click{' '}
+                  <strong className="text-slate-500">Verify with x402</strong>{' '}
+                  to initiate the payment challenge and receive an independent verdict.
                 </p>
               </div>
             )}
+
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-950/90 py-6 font-mono text-xs text-slate-500">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <footer className="border-t border-slate-800 bg-slate-950 py-5 font-mono text-[11px] text-slate-600">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-300">Verdict404</span>
+            <span className="font-bold text-slate-400">Verdict404</span>
             <span>·</span>
             <span>Independent Verification Infrastructure for AI Agents</span>
           </div>
-
-          <div className="flex items-center gap-4 text-slate-400">
+          <div className="flex items-center gap-3 text-slate-600">
             <span>Algorand TestNet</span>
             <span>·</span>
             <span>x402 Protocol v0.2</span>
             <span>·</span>
-            <span className="text-cyan-400">0.01 USDC / run</span>
+            <span className="text-cyan-600">0.01 USDC / run</span>
           </div>
         </div>
       </footer>
 
-      {/* Architecture & Flow Modal */}
+      {/* Architecture Modal */}
       <ArchitectureModal
         isOpen={isArchitectureOpen}
         onClose={() => setIsArchitectureOpen(false)}

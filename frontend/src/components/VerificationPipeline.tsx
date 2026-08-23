@@ -4,15 +4,7 @@ import {
   PaymentSimulationInfo,
   VerdictResultType,
 } from '../types/verdict';
-import {
-  Send,
-  CreditCard,
-  CheckCircle2,
-  Cpu,
-  ShieldCheck,
-  Loader2,
-  Clock,
-} from 'lucide-react';
+import { Loader2, Clock } from 'lucide-react';
 
 interface VerificationPipelineProps {
   state: VerificationState;
@@ -23,54 +15,41 @@ interface VerificationPipelineProps {
 
 interface StepDef {
   id: string;
-  title: string;
-  subtitle: string;
+  label: string;
+  sublabel: string;
   statesTriggered: VerificationState[];
-  icon: any;
 }
 
 const STEPS: StepDef[] = [
   {
     id: 'step-req',
-    title: '1. Request',
-    subtitle: 'POST /verify',
+    label: 'REQUEST',
+    sublabel: 'POST /verify',
     statesTriggered: ['REQUESTING', 'PAYMENT_REQUIRED', 'PAYING', 'PAYMENT_SETTLED', 'VERIFYING', 'PASS', 'FAIL', 'ERROR'],
-    icon: Send,
   },
   {
     id: 'step-402',
-    title: '2. 402 Required',
-    subtitle: 'x402 Protocol Challenge',
+    label: 'PAYMENT',
+    sublabel: 'x402 Protocol Challenge',
     statesTriggered: ['PAYMENT_REQUIRED', 'PAYING', 'PAYMENT_SETTLED', 'VERIFYING', 'PASS', 'FAIL', 'ERROR'],
-    icon: CreditCard,
-  },
-  {
-    id: 'step-pay',
-    title: '3. x402 Micropay',
-    subtitle: '0.01 USDC on Algorand',
-    statesTriggered: ['PAYING', 'PAYMENT_SETTLED', 'VERIFYING', 'PASS', 'FAIL', 'ERROR'],
-    icon: CreditCard,
   },
   {
     id: 'step-settle',
-    title: '4. Settle ✓',
-    subtitle: 'On-chain Confirmation',
-    statesTriggered: ['PAYMENT_SETTLED', 'VERIFYING', 'PASS', 'FAIL', 'ERROR'],
-    icon: CheckCircle2,
+    label: 'SETTLEMENT',
+    sublabel: '0.01 USDC · Algorand',
+    statesTriggered: ['PAYING', 'PAYMENT_SETTLED', 'VERIFYING', 'PASS', 'FAIL', 'ERROR'],
   },
   {
     id: 'step-verify',
-    title: '5. Verify Engine',
-    subtitle: 'AST & Invariant Analysis',
+    label: 'VERIFICATION',
+    sublabel: 'AST & Invariant Analysis',
     statesTriggered: ['VERIFYING', 'PASS', 'FAIL', 'ERROR'],
-    icon: Cpu,
   },
   {
     id: 'step-verdict',
-    title: '6. Verdict',
-    subtitle: 'Independent Result',
+    label: 'VERDICT',
+    sublabel: 'Independent Result',
     statesTriggered: ['PASS', 'FAIL', 'ERROR'],
-    icon: ShieldCheck,
   },
 ];
 
@@ -88,7 +67,7 @@ export const VerificationPipeline: React.FC<VerificationPipelineProps> = ({
     state === 'PAYMENT_SETTLED' ||
     state === 'VERIFYING';
 
-  // Helper to determine step status
+  // Existing step status logic — untouched
   const getStepStatus = (index: number) => {
     if (state === 'IDLE') return 'idle';
 
@@ -99,13 +78,13 @@ export const VerificationPipeline: React.FC<VerificationPipelineProps> = ({
       'PAYING',
       'PAYMENT_SETTLED',
       'VERIFYING',
-      'PASS', // or FAIL or ERROR
+      'PASS',
     ];
 
     let currentOrderIdx = order.indexOf(state);
     if (state === 'FAIL' || state === 'ERROR') currentOrderIdx = 6;
 
-    const stepOrderIdx = index + 1; // 1-indexed to match steps
+    const stepOrderIdx = index + 1;
 
     if (currentOrderIdx > stepOrderIdx) return 'completed';
     if (currentOrderIdx === stepOrderIdx) {
@@ -115,130 +94,162 @@ export const VerificationPipeline: React.FC<VerificationPipelineProps> = ({
     return 'idle';
   };
 
-  return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-xl backdrop-blur-md space-y-4">
-      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-cyan-950 text-cyan-400 border border-cyan-800">
-            <ShieldCheck className="h-3.5 w-3.5" />
-          </div>
-          <h3 className="font-mono text-xs uppercase tracking-wider font-semibold text-slate-300">
-            x402 Verification Pipeline State
-          </h3>
-        </div>
+  // Verdict step status for final step
+  const getVerdictStepStatus = () => {
+    if (isTerminal) return 'verdict';
+    const stepStatus = getStepStatus(4);
+    return stepStatus;
+  };
 
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-xs text-slate-400">Current State:</span>
-          <span
-            className={`rounded-md px-2 py-0.5 font-mono text-[11px] font-bold uppercase ${
-              state === 'IDLE'
-                ? 'bg-slate-800 text-slate-400'
-                : state === 'PASS'
-                ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                : state === 'FAIL'
-                ? 'bg-rose-950 text-rose-400 border border-rose-800'
-                : state === 'ERROR'
-                ? 'bg-amber-950 text-amber-400 border border-amber-800'
-                : 'bg-cyan-950 text-cyan-300 border border-cyan-800 animate-pulse'
-            }`}
-          >
-            {state}
-          </span>
-        </div>
+  return (
+    <div className="border border-slate-800 rounded bg-slate-950/80 p-4 space-y-3">
+
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <p className="console-label">Verification Pipeline</p>
+        <span
+          className={`font-mono text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${
+            state === 'IDLE'
+              ? 'border-slate-800 text-slate-600 bg-slate-900'
+              : state === 'PASS'
+              ? 'border-emerald-800 text-emerald-400 bg-emerald-950/50'
+              : state === 'FAIL'
+              ? 'border-red-800 text-red-400 bg-red-950/50'
+              : state === 'ERROR'
+              ? 'border-amber-800 text-amber-400 bg-amber-950/50'
+              : 'border-cyan-800 text-cyan-400 bg-cyan-950/50 animate-pulse-subtle'
+          }`}
+        >
+          {state}
+        </span>
       </div>
 
-      {/* Visual Stepper */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      {/* Vertical step list */}
+      <div className="flex flex-col">
         {STEPS.map((step, idx) => {
-          const stepStatus = getStepStatus(idx);
-          const Icon = step.icon;
+          const isLastStep = idx === STEPS.length - 1;
+          const stepStatus = isLastStep ? getVerdictStepStatus() : getStepStatus(idx);
 
-          let cardStyle = 'border-slate-800 bg-slate-950/40 text-slate-500';
-          let iconContainer = 'bg-slate-900 text-slate-600';
+          // Determine rendering
+          let dotClass = 'step-dot-idle';
+          let labelClass = 'text-slate-600';
+          let sublabelClass = 'text-slate-700';
+          let badge: React.ReactNode = null;
+          let symbol = '○';
+          let connectorClass = 'step-connector';
 
           if (stepStatus === 'completed') {
-            if (idx === 5) {
-              // Final verdict step
-              if (finalVerdict === 'PASS') {
-                cardStyle = 'border-emerald-500/50 bg-emerald-950/30 text-emerald-300';
-                iconContainer = 'bg-emerald-500/20 text-emerald-400';
-              } else if (finalVerdict === 'FAIL') {
-                cardStyle = 'border-rose-500/50 bg-rose-950/30 text-rose-300';
-                iconContainer = 'bg-rose-500/20 text-rose-400';
-              } else {
-                cardStyle = 'border-amber-500/50 bg-amber-950/30 text-amber-300';
-                iconContainer = 'bg-amber-500/20 text-amber-400';
-              }
-            } else {
-              cardStyle = 'border-cyan-500/40 bg-cyan-950/20 text-cyan-200';
-              iconContainer = 'bg-cyan-500/20 text-cyan-400';
-            }
+            dotClass = 'step-dot-done';
+            labelClass = 'text-slate-300';
+            sublabelClass = 'text-slate-500';
+            symbol = '✓';
+            connectorClass = 'step-connector-done';
           } else if (stepStatus === 'active') {
-            cardStyle =
-              'border-cyan-400 bg-cyan-950/40 text-white shadow-md shadow-cyan-500/20 ring-1 ring-cyan-400';
-            iconContainer = 'bg-cyan-400 text-slate-950 animate-spin-slow';
+            dotClass = 'step-dot-active';
+            labelClass = 'text-white font-semibold';
+            sublabelClass = 'text-slate-400';
+            symbol = '◉';
+            badge = (
+              <span className="ml-2 font-mono text-[9px] uppercase text-cyan-500 border border-cyan-900 px-1 py-0.5 rounded">
+                running
+              </span>
+            );
+          } else if (stepStatus === 'verdict') {
+            // Final verdict step with colour
+            if (finalVerdict === 'PASS') {
+              dotClass = 'step-dot-pass';
+              labelClass = 'text-green-400 font-bold';
+              sublabelClass = 'text-green-600';
+              symbol = '✓';
+              connectorClass = 'step-connector-done';
+            } else if (finalVerdict === 'FAIL') {
+              dotClass = 'step-dot-fail';
+              labelClass = 'text-red-400 font-bold';
+              sublabelClass = 'text-red-600';
+              symbol = '✗';
+              connectorClass = 'step-connector-done';
+            } else if (finalVerdict === 'ERROR') {
+              dotClass = 'step-dot-error';
+              labelClass = 'text-amber-400 font-bold';
+              sublabelClass = 'text-amber-600';
+              symbol = '⚠';
+              connectorClass = 'step-connector-done';
+            } else {
+              // terminal but no verdict yet — treat as completed
+              dotClass = 'step-dot-done';
+              labelClass = 'text-slate-300';
+              sublabelClass = 'text-slate-500';
+              symbol = '✓';
+              connectorClass = 'step-connector-done';
+            }
           }
 
           return (
-            <div
-              key={step.id}
-              className={`flex flex-col justify-between rounded-xl border p-3 transition-all ${cardStyle}`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className={`p-1.5 rounded-lg ${iconContainer}`}>
-                  {stepStatus === 'active' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Icon className="h-4 w-4" />
-                  )}
-                </div>
-                <span className="font-mono text-[10px] uppercase font-bold text-slate-400">
-                  {stepStatus === 'completed' ? '✓ DONE' : stepStatus === 'active' ? '● RUN' : 'WAIT'}
-                </span>
+            <div key={step.id} className="flex gap-3">
+              {/* Left: dot + connector */}
+              <div className="flex flex-col items-center" style={{ width: 10 }}>
+                <div className={dotClass} aria-hidden="true" />
+                {!isLastStep && (
+                  <div className={connectorClass} />
+                )}
               </div>
 
-              <div>
-                <div className="font-mono text-xs font-semibold">{step.title}</div>
-                <div className="text-[10px] text-slate-400 truncate">{step.subtitle}</div>
+              {/* Right: label */}
+              <div className={`pb-${isLastStep ? '0' : '3'} min-w-0 flex-1`} style={{ paddingBottom: isLastStep ? 0 : 12 }}>
+                <div className="flex items-center gap-1">
+                  <span className={`font-mono text-xs ${labelClass}`}>
+                    <span className="text-[10px] mr-1 opacity-50 select-none">{symbol}</span>
+                    {step.label}
+                  </span>
+                  {badge}
+                  {stepStatus === 'active' && (
+                    <Loader2 className="h-3 w-3 text-cyan-500 animate-spin ml-1" />
+                  )}
+                </div>
+                <div className={`font-mono text-[10px] ${sublabelClass}`}>
+                  {step.sublabel}
+                </div>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Active Progression Message Bar */}
+      {/* Status message bar */}
       {statusMessage && (
-        <div className="flex items-center gap-2.5 rounded-xl border border-slate-800 bg-slate-950/80 px-3.5 py-2.5 font-mono text-xs text-slate-300">
+        <div className="flex items-center gap-2 border-t border-slate-800 pt-3 font-mono text-[11px] text-slate-400">
           {isRunning ? (
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-cyan-400" />
-          ) : isTerminal ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+            <Loader2 className="h-3 w-3 shrink-0 animate-spin text-cyan-500" />
           ) : (
-            <Clock className="h-4 w-4 shrink-0 text-slate-400" />
+            <Clock className="h-3 w-3 shrink-0 text-slate-600" />
           )}
-          <span className="flex-1">{statusMessage}</span>
+          <span className="flex-1 truncate">{statusMessage}</span>
         </div>
       )}
 
-      {/* Payment / Algorand Transaction Info Pill */}
+      {/* Payment info */}
       {paymentInfo && paymentInfo.status === 'SETTLED' && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-indigo-500/30 bg-indigo-950/20 px-3.5 py-2 font-mono text-xs text-indigo-300">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
+        <div className="flex flex-col gap-1 border-t border-slate-800 pt-3 font-mono text-[11px]">
+          <div className="flex items-center gap-2 text-indigo-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0"></span>
             <span>
-              Settlement: <strong className="text-white">0.01 USDC</strong> on Algorand TestNet
+              Settled: <strong className="text-white">0.01 USDC</strong> · Algorand TestNet
             </span>
           </div>
           {paymentInfo.txHash && (
-            <div className="flex items-center gap-1.5 text-[11px] text-indigo-400">
-              <span className="text-slate-400">Tx:</span>
-              <span className="font-mono truncate max-w-[160px] sm:max-w-[200px]" title={paymentInfo.txHash}>
+            <div className="text-slate-600 flex items-center gap-1.5 pl-3.5">
+              <span>Tx:</span>
+              <span
+                className="text-slate-500 truncate max-w-[180px]"
+                title={paymentInfo.txHash}
+              >
                 {paymentInfo.txHash}
               </span>
             </div>
           )}
         </div>
       )}
+
     </div>
   );
 };
