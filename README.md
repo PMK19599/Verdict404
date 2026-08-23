@@ -105,43 +105,62 @@ The underlying architecture can therefore support additional verification module
 
 ---
 
-# Verification Target 1: `safe_divide`
+## Verification Targets
 
-`safe_divide` verifies a Python function against four deterministic invariants.
+Verdict404 currently supports three independent verification targets:
 
-The verifier checks:
+### 1. `safe_divide` — Python
 
-1. `divide()` accepts exactly two parameters.
-2. A division operation exists.
-3. An explicit zero-division guard exists.
-4. The function returns a result.
+Verifies Python division logic against deterministic safety invariants.
 
-### Passing Example
+Checks include:
+- `divide()` accepts exactly two parameters
+- A division operation exists
+- An explicit zero-division guard exists
+- The function returns a result
 
-```python
-def divide(a, b):
-    if b == 0:
-        return None
-    return a / b
-```
+Possible verdicts:
+- `PASS`
+- `FAIL`
+- `ERROR`
 
-Expected result:
+---
 
-```text
-PASS
-Tests passed: 4
-Tests failed: 0
-Confidence: 100%
-```
+### 2. `validate_json` — JSON
 
-Evidence trace:
+Validates structured AI-generated JSON payloads against deterministic schema and type requirements.
 
-```text
-PASS: divide() accepts two parameters.
-PASS: division operation detected.
-PASS: zero-division guard detected.
-PASS: function returns a result.
-```
+This allows agents to submit structured outputs for independent validation instead of trusting their own self-evaluation.
+
+Possible verdicts:
+- `PASS`
+- `FAIL`
+- `ERROR`
+
+---
+
+### 3. `agent_action` — JSON
+
+Verifies autonomous agent actions **before execution** using deterministic policy invariants.
+
+The current payment-action policy validates:
+
+1. Action must be `send_payment`
+2. Payment amount must be a positive number
+3. Payment amount must not exceed `100 USDC`
+4. Payment currency must be `USDC`
+5. Payment recipient must be present
+
+Example payload:
+
+```json
+{
+  "action": "send_payment",
+  "amount": 50,
+  "currency": "USDC",
+  "recipient": "ALICE",
+  "reason": "Pay invoice"
+}
 
 ### Failing Example
 
