@@ -302,32 +302,65 @@ app.post("/verify", async (c) => {
       }
     );
 
-    const result = await response.json();
+    const responseText = await response.text();
 
-    if (!response.ok) {
-      c.status(502);
+let result: any;
 
-      return c.json({
-        service: "Verdict404",
-        task:
-          typeof body?.task === "string"
-            ? body.task
-            : "unknown",
-        language:
-          typeof body?.language === "string"
-            ? body.language.toLowerCase()
-            : "unknown",
-        verdict: "ERROR",
-        tests_passed: 0,
-        tests_failed: 0,
-        confidence: 0,
-        evidence: [
-          "Verification engine returned an error."
-        ]
-      });
-    }
+try {
+  result = JSON.parse(responseText);
+} catch (parseError) {
+  console.error(
+    "Verification engine returned non-JSON:",
+    response.status,
+    responseText.slice(0, 500)
+  );
 
-    return c.json(result);
+  c.status(502);
+
+  return c.json({
+    service: "Verdict404",
+    task:
+      typeof body?.task === "string"
+        ? body.task
+        : "unknown",
+    language:
+      typeof body?.language === "string"
+        ? body.language.toLowerCase()
+        : "unknown",
+    verdict: "ERROR",
+    tests_passed: 0,
+    tests_failed: 0,
+    confidence: 0,
+    evidence: [
+      `Verification engine returned non-JSON response (HTTP ${response.status}).`
+    ]
+  });
+}
+
+if (!response.ok) {
+  c.status(502);
+
+  return c.json({
+    service: "Verdict404",
+    task:
+      typeof body?.task === "string"
+        ? body.task
+        : "unknown",
+    language:
+      typeof body?.language === "string"
+        ? body.language.toLowerCase()
+        : "unknown",
+    verdict: "ERROR",
+    tests_passed: 0,
+    tests_failed: 0,
+    confidence: 0,
+    evidence: [
+      "Verification engine returned an error."
+    ]
+  });
+}
+
+return c.json(result);
   } catch (error) {
     console.error(error);
 
