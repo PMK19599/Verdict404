@@ -61,7 +61,14 @@ app.use('*', async (c, next) => {
     'https://verdict404.vercel.app'
   ];
 
-  if (origin && allowedOrigins.includes(origin)) {
+  const isVercelPreview =
+    typeof origin === 'string' &&
+    /^https:\/\/verdict404-[a-z0-9-]+\.vercel\.app$/i.test(origin);
+
+  if (
+    origin &&
+    (allowedOrigins.includes(origin) || isVercelPreview)
+  ) {
     c.header('Access-Control-Allow-Origin', origin);
     c.header('Vary', 'Origin');
     c.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -96,7 +103,8 @@ app.get("/", (c) => {
     verification_endpoint: "/verify",
     supported_tasks: [
       "safe_divide",
-      "validate_json"
+      "validate_json",
+      "agent_action"
     ]
   });
 });
@@ -211,6 +219,10 @@ app.use("/verify", async (c, next) => {
     ) ||
     (
       task === "validate_json" &&
+      normalizedLanguage === "json"
+    ) ||
+    (
+      task === "agent_action" &&
       normalizedLanguage === "json"
     );
 
@@ -335,5 +347,3 @@ serve({
 console.log(
   "Verdict404 x402 gateway running on http://127.0.0.1:3000"
 );
-
-
