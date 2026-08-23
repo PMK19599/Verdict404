@@ -4,7 +4,7 @@
 
 Verdict404 is an **independent, pay-per-use verification layer for autonomous AI agents**.
 
-Instead of allowing an AI agent to evaluate its own generated code or structured output, Verdict404 provides an external verification service that returns a deterministic **PASS / FAIL / ERROR** verdict with an evidence trace.
+Instead of allowing an AI agent to evaluate its own generated code, structured output, or autonomous actions, Verdict404 provides an external verification service that returns a deterministic **PASS / FAIL / ERROR** verdict with an evidence trace.
 
 Verification is requested through **x402** and currently costs **0.01 USDC on Algorand TestNet**.
 
@@ -42,7 +42,7 @@ Verdict404 approaches this differently:
 
 Verdict404 acts as an **independent verification layer** between an autonomous agent and the result it wants to trust.
 
-An agent submits generated code or structured output to Verdict404.
+An agent submits generated code, structured output, or an autonomous action to Verdict404.
 
 The system then:
 
@@ -90,18 +90,13 @@ Evidence Trace
 
 # What We Built
 
-Verdict404 currently provides a working paid verification gateway with **three deterministic verification targets*:
+Verdict404 currently provides a working paid verification gateway with three deterministic verification targets:
 
-1. `safe_divide` — Python code verification
-2. `validate_json` — structured JSON verification
+safe_divide — Python code verification
+validate_json — structured JSON verification
+agent_action — autonomous action verification
 
-The purpose of having two targets is important.
-
-We are **not building a product that only checks one `divide()` function**.
-
-1. safe_divide — Python code verification
-2. validate_json — structured JSON verification
-3. agent_action — autonomous action verification
+The same paid verification layer can independently evaluate different types of agent-generated payloads and can be extended with additional verification modules.
 
 The underlying architecture can therefore support additional verification modules later.
 
@@ -154,6 +149,19 @@ The current payment-action policy validates:
 5. Payment recipient must be present
 
 Example payload:
+       
+Expected result:
+PASS
+Tests passed: 5
+Tests failed: 0
+Confidence: 100%
+
+Evidence trace:
+PASS: supported action 'send_payment' detected.
+PASS: payment amount is a positive number.
+PASS: payment amount is within the 100 USDC policy limit.
+PASS: payment currency is USDC.
+PASS: payment recipient is present.
 
 ```json
 {
@@ -163,6 +171,7 @@ Example payload:
   "recipient": "ALICE",
   "reason": "Pay invoice"
 }
+```
 
 ### Failing Example
 
