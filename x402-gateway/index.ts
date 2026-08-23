@@ -148,6 +148,9 @@ app.use("/verify", async (c, next) => {
     });
   }
 
+  c.set("verificationBody", body);
+
+
   const task = body.task;
   const language = body.language;
   const code = body.code;
