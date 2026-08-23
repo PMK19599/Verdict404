@@ -37,14 +37,15 @@ def health():
     return {
         "service": "Verdict404 Verification Engine",
         "status": "running",
-        "version": "0.3",
+        "version": "0.4",
         "supported_languages": [
             "python",
             "json"
         ],
         "supported_tasks": [
             "safe_divide",
-            "validate_json"
+            "validate_json",
+            "agent_action"
         ]
     }
 
@@ -53,29 +54,16 @@ def verify_safe_divide(request: VerifyRequest):
 
     if request.language.lower() != "python":
         return build_response(
-            request,
-            "ERROR",
-            0,
-            0,
-            0,
-            [
-                "safe_divide requires language 'python'."
-            ]
+            request, "ERROR", 0, 0, 0,
+            ["safe_divide requires language 'python'."]
         )
 
     try:
         tree = ast.parse(request.code)
-
     except SyntaxError as error:
         return build_response(
-            request,
-            "ERROR",
-            0,
-            1,
-            100,
-            [
-                f"Python syntax error at line {error.lineno}."
-            ]
+            request, "ERROR", 0, 1, 100,
+            [f"Python syntax error at line {error.lineno}."]
         )
 
     divide_function = None
@@ -87,14 +75,8 @@ def verify_safe_divide(request: VerifyRequest):
 
     if divide_function is None:
         return build_response(
-            request,
-            "FAIL",
-            0,
-            4,
-            100,
-            [
-                "Required function 'divide' was not found."
-            ]
+            request, "FAIL", 0, 4, 100,
+            ["Required function 'divide' was not found."]
         )
 
     tests_passed = 0
@@ -103,14 +85,10 @@ def verify_safe_divide(request: VerifyRequest):
 
     if len(divide_function.args.args) == 2:
         tests_passed += 1
-        evidence.append(
-            "PASS: divide() accepts two parameters."
-        )
+        evidence.append("PASS: divide() accepts two parameters.")
     else:
         tests_failed += 1
-        evidence.append(
-            "FAIL: divide() must accept exactly two parameters."
-        )
+        evidence.append("FAIL: divide() must accept exactly two parameters.")
 
     has_division = any(
         isinstance(node, ast.BinOp)
@@ -120,27 +98,19 @@ def verify_safe_divide(request: VerifyRequest):
 
     if has_division:
         tests_passed += 1
-        evidence.append(
-            "PASS: division operation detected."
-        )
+        evidence.append("PASS: division operation detected.")
     else:
         tests_failed += 1
-        evidence.append(
-            "FAIL: no division operation detected."
-        )
+        evidence.append("FAIL: no division operation detected.")
 
     has_zero_guard = False
 
     for node in ast.walk(divide_function):
         if isinstance(node, ast.Compare):
-
             contains_zero = any(
                 isinstance(value, ast.Constant)
                 and value.value == 0
-                for value in [
-                    node.left,
-                    *node.comparators
-                ]
+                for value in [node.left, *node.comparators]
             )
 
             if contains_zero:
@@ -149,14 +119,10 @@ def verify_safe_divide(request: VerifyRequest):
 
     if has_zero_guard:
         tests_passed += 1
-        evidence.append(
-            "PASS: zero-division guard detected."
-        )
+        evidence.append("PASS: zero-division guard detected.")
     else:
         tests_failed += 1
-        evidence.append(
-            "FAIL: no explicit zero-division guard detected."
-        )
+        evidence.append("FAIL: no explicit zero-division guard detected.")
 
     has_return = any(
         isinstance(node, ast.Return)
@@ -165,29 +131,15 @@ def verify_safe_divide(request: VerifyRequest):
 
     if has_return:
         tests_passed += 1
-        evidence.append(
-            "PASS: function returns a result."
-        )
+        evidence.append("PASS: function returns a result.")
     else:
         tests_failed += 1
-        evidence.append(
-            "FAIL: function does not return a result."
-        )
+        evidence.append("FAIL: function does not return a result.")
 
-    verdict = (
-        "PASS"
-        if tests_failed == 0
-        else "FAIL"
-    )
+    verdict = "PASS" if tests_failed == 0 else "FAIL"
 
     confidence = round(
-        (
-            tests_passed
-            / (
-                tests_passed
-                + tests_failed
-            )
-        ) * 100
+        (tests_passed / (tests_passed + tests_failed)) * 100
     )
 
     return build_response(
@@ -204,14 +156,8 @@ def verify_json_output(request: VerifyRequest):
 
     if request.language.lower() != "json":
         return build_response(
-            request,
-            "ERROR",
-            0,
-            0,
-            0,
-            [
-                "validate_json requires language 'json'."
-            ]
+            request, "ERROR", 0, 0, 0,
+            ["validate_json requires language 'json'."]
         )
 
     try:
@@ -219,11 +165,7 @@ def verify_json_output(request: VerifyRequest):
 
     except json.JSONDecodeError as error:
         return build_response(
-            request,
-            "ERROR",
-            0,
-            1,
-            100,
+            request, "ERROR", 0, 1, 100,
             [
                 (
                     "Invalid JSON syntax at "
@@ -235,14 +177,8 @@ def verify_json_output(request: VerifyRequest):
 
     if not isinstance(data, dict):
         return build_response(
-            request,
-            "FAIL",
-            0,
-            4,
-            100,
-            [
-                "JSON root must be an object."
-            ]
+            request, "FAIL", 0, 4, 100,
+            ["JSON root must be an object."]
         )
 
     tests_passed = 0
@@ -251,65 +187,164 @@ def verify_json_output(request: VerifyRequest):
 
     if "name" in data:
         tests_passed += 1
-        evidence.append(
-            "PASS: required field 'name' exists."
-        )
+        evidence.append("PASS: required field 'name' exists.")
     else:
         tests_failed += 1
-        evidence.append(
-            "FAIL: required field 'name' is missing."
-        )
+        evidence.append("FAIL: required field 'name' is missing.")
 
     if "age" in data:
         tests_passed += 1
-        evidence.append(
-            "PASS: required field 'age' exists."
-        )
+        evidence.append("PASS: required field 'age' exists.")
     else:
         tests_failed += 1
-        evidence.append(
-            "FAIL: required field 'age' is missing."
-        )
+        evidence.append("FAIL: required field 'age' is missing.")
 
     if isinstance(data.get("name"), str):
         tests_passed += 1
-        evidence.append(
-            "PASS: 'name' is a string."
-        )
+        evidence.append("PASS: 'name' is a string.")
     else:
         tests_failed += 1
-        evidence.append(
-            "FAIL: 'name' must be a string."
-        )
+        evidence.append("FAIL: 'name' must be a string.")
 
     if (
         isinstance(data.get("age"), int)
         and not isinstance(data.get("age"), bool)
     ):
         tests_passed += 1
+        evidence.append("PASS: 'age' is an integer.")
+    else:
+        tests_failed += 1
+        evidence.append("FAIL: 'age' must be an integer.")
+
+    verdict = "PASS" if tests_failed == 0 else "FAIL"
+
+    confidence = round(
+        (tests_passed / (tests_passed + tests_failed)) * 100
+    )
+
+    return build_response(
+        request,
+        verdict,
+        tests_passed,
+        tests_failed,
+        confidence,
+        evidence
+    )
+
+
+def verify_agent_action(request: VerifyRequest):
+
+    if request.language.lower() != "json":
+        return build_response(
+            request, "ERROR", 0, 0, 0,
+            ["agent_action requires language 'json'."]
+        )
+
+    try:
+        action = json.loads(request.code)
+
+    except json.JSONDecodeError as error:
+        return build_response(
+            request, "ERROR", 0, 1, 100,
+            [
+                (
+                    "Invalid agent action JSON at "
+                    f"line {error.lineno}, "
+                    f"column {error.colno}."
+                )
+            ]
+        )
+
+    if not isinstance(action, dict):
+        return build_response(
+            request, "ERROR", 0, 5, 100,
+            ["Agent action must be a JSON object."]
+        )
+
+    tests_passed = 0
+    tests_failed = 0
+    evidence = []
+
+    # 1. Supported action
+    if action.get("action") == "send_payment":
+        tests_passed += 1
         evidence.append(
-            "PASS: 'age' is an integer."
+            "PASS: supported action 'send_payment' detected."
         )
     else:
         tests_failed += 1
         evidence.append(
-            "FAIL: 'age' must be an integer."
+            "FAIL: unsupported or missing action. "
+            "Only 'send_payment' is currently allowed."
         )
 
-    verdict = (
-        "PASS"
-        if tests_failed == 0
-        else "FAIL"
-    )
+    # 2. Positive amount
+    amount = action.get("amount")
+
+    if (
+        isinstance(amount, (int, float))
+        and not isinstance(amount, bool)
+        and amount > 0
+    ):
+        tests_passed += 1
+        evidence.append(
+            "PASS: payment amount is a positive number."
+        )
+    else:
+        tests_failed += 1
+        evidence.append(
+            "FAIL: payment amount must be a positive number."
+        )
+
+    # 3. Policy limit
+    if (
+        isinstance(amount, (int, float))
+        and not isinstance(amount, bool)
+        and amount <= 100
+    ):
+        tests_passed += 1
+        evidence.append(
+            "PASS: payment amount is within the 100 USDC policy limit."
+        )
+    else:
+        tests_failed += 1
+        evidence.append(
+            "FAIL: payment amount exceeds the 100 USDC policy limit."
+        )
+
+    # 4. Currency
+    if action.get("currency") == "USDC":
+        tests_passed += 1
+        evidence.append(
+            "PASS: payment currency is USDC."
+        )
+    else:
+        tests_failed += 1
+        evidence.append(
+            "FAIL: payment currency must be USDC."
+        )
+
+    # 5. Recipient
+    recipient = action.get("recipient")
+
+    if (
+        isinstance(recipient, str)
+        and recipient.strip() != ""
+    ):
+        tests_passed += 1
+        evidence.append(
+            "PASS: payment recipient is present."
+        )
+    else:
+        tests_failed += 1
+        evidence.append(
+            "FAIL: payment recipient is required."
+        )
+
+    verdict = "PASS" if tests_failed == 0 else "FAIL"
 
     confidence = round(
-        (
-            tests_passed
-            / (
-                tests_passed
-                + tests_failed
-            )
-        ) * 100
+        (tests_passed / (tests_passed + tests_failed)) * 100
     )
 
     return build_response(
@@ -330,6 +365,9 @@ def run_tests(request: VerifyRequest):
 
     if request.task == "validate_json":
         return verify_json_output(request)
+
+    if request.task == "agent_action":
+        return verify_agent_action(request)
 
     return build_response(
         request,
