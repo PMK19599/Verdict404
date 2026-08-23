@@ -12,7 +12,7 @@ Verification is requested through **x402** and currently costs **0.01 USDC on Al
 
 ## The Problem
 
-Autonomous AI agents are increasingly capable of generating code, structured outputs, decisions, and actions on behalf of users.
+Autonomous AI agents are increasingly capable of generated code, structured output, or autonomous actions, decisions, and actions on behalf of users.
 
 But this creates a fundamental trust problem:
 
@@ -42,7 +42,7 @@ Verdict404 approaches this differently:
 
 Verdict404 acts as an **independent verification layer** between an autonomous agent and the result it wants to trust.
 
-An agent submits generated code, structured output, or an autonomous action to Verdict404.
+An agent submits generated code, structured output, or an autonomous action, or an autonomous action to Verdict404.
 
 The system then:
 
@@ -90,15 +90,13 @@ Evidence Trace
 
 # What We Built
 
-Verdict404 currently provides a working paid verification gateway with three deterministic verification targets:
+Verdict404 currently provides a working paid verification gateway with **three deterministic verification targets**:
 
-safe_divide — Python code verification
-validate_json — structured JSON verification
-agent_action — autonomous action verification
+1. `safe_divide` — Python code verification
+2. `validate_json` — structured JSON verification
+3. `agent_action` — autonomous action verification
 
 The same paid verification layer can independently evaluate different types of agent-generated payloads and can be extended with additional verification modules.
-
-The underlying architecture can therefore support additional verification modules later.
 
 ---
 
@@ -874,7 +872,7 @@ Deterministic verdict
 Evidence
 ```
 
-The two verification targets demonstrate that the architecture can support different payload types.
+The three verification targets demonstrate that the architecture can support different payload types.
 
 ---
 
@@ -935,7 +933,7 @@ Secrets and deployment-specific credentials should be configured through the dep
 
 # Future Scope
 
-The current prototype demonstrates deterministic verification for Python code and JSON outputs.
+The current prototype demonstrates deterministic verification for Python code, JSON outputs, and autonomous agent actions.
 
 The same architecture can be extended with additional verification modules, including:
 
