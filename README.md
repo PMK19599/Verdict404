@@ -581,24 +581,33 @@ The evidence array makes the result inspectable instead of returning only a sing
 
 ---
 
-# On-Chain & Payment Details
+## On-Chain Payment Proof
 
-Verdict404 uses Algorand TestNet for the payment settlement layer.
+Verdict404 uses x402 with Algorand TestNet for pay-per-use verification.
+
+Every successful verification request settles a `0.01 USDC` payment on-chain before the verification result is returned.
 
 | Property | Value |
 |---|---|
 | Network | Algorand TestNet |
 | Payment asset | USDC |
-| Verification price | 0.01 USDC |
+| USDC Asset ID | `10458941` |
+| Verification price | `0.01 USDC` |
 | Payment protocol | x402 |
-| Payment model | Pay-per-request |
-| Payment recipient | Configured Algorand address |
+| Payment recipient | `DKDPLWC6LSEAYGJS5M7X5B4UAUWQZXV66VHUDCGELMP3XY4OXVOTXF6FX4` |
+| Example transaction | `3DCJL2LNH2UKRQQXZK6637R0G474XISMPPGJFUEEOAAL6UYZH5AA` |
+| Block | `66584180` |
 
-### Public Payment Recipient
+### Verified TestNet Transaction
 
-```text
-DKDPLWC6LSEAYGJS5M7X5B4UAUWQZXV66VHUDCGELMP3XY4OXVOTXF6FX4
-```
+An example successful x402 verification payment can be independently inspected on Algorand TestNet.
+
+- **Transaction ID:** `3DCJL2LNH2UKRQQXZK6637R0G474XISMPPGJFUEEOAAL6UYZH5AA`
+- **Amount:** `0.01 USDC`
+- **Asset ID:** `10458941`
+- **Recipient:** `DKDPLWC6LSEAYGJS5M7X5B4UAUWQZXV66VHUDCGELMP3XY4OXVOTXF6FX4`
+- **Block:** `66584180`
+- **Timestamp:** `23 August 2026, 12:25:04`
 
 ---
 
