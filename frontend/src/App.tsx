@@ -23,11 +23,15 @@ export const App: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState<TaskType>('safe_divide');
   const [code, setCode] = useState<string>(TASK_CONFIGS.safe_divide.defaultCode);
   const [verificationState, setVerificationState] = useState<VerificationState>('IDLE');
-  const [statusMessage, setStatusMessage] = useState<string>('Ready to verify code with x402.');
+  const [statusMessage, setStatusMessage] = useState<string>(
+    'Ready for independent verification with x402.'
+  );
   const [paymentInfo, setPaymentInfo] = useState<PaymentSimulationInfo | null>(null);
   const [result, setResult] = useState<VerifyResponse | null>(null);
   const [gatewayHealth, setGatewayHealth] = useState<GatewayHealth | null>(null);
-  const [isMockMode, setIsMockMode] = useState<boolean>(true);
+  const [isMockMode, setIsMockMode] = useState<boolean>(
+    (import.meta as any).env?.VITE_USE_MOCK === 'true'
+  );
   const [isArchitectureOpen, setIsArchitectureOpen] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -147,7 +151,11 @@ export const App: React.FC = () => {
                   Select Verification Target
                 </h2>
                 <span className="ml-auto font-mono text-[10px] text-slate-600">
-                  {selectedTask === 'safe_divide' ? 'safe_divide · Python' : 'validate_json · JSON'}
+                  {selectedTask === 'safe_divide'
+                    ? 'safe_divide · Python'
+                    : selectedTask === 'validate_json'
+                      ? 'validate_json · JSON'
+                      : 'agent_action · JSON'}
                 </span>
               </div>
               <TaskSelector

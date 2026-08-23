@@ -57,7 +57,7 @@ class VerificationService {
   private verifyServiceUrl: string =
     DEFAULT_VERIFY_SERVICE_URL;
 
-  private isMockMode = true;
+  private isMockMode = false;
 
   /**
    * Connected Algorand wallet signer.

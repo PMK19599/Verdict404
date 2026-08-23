@@ -2,7 +2,11 @@
  * Authoritative Verdict404 Types based on docs/API.md contract
  */
 
-export type TaskType = 'safe_divide' | 'validate_json';
+export type TaskType =
+  | 'safe_divide'
+  | 'validate_json'
+  | 'agent_action';
+
 export type LanguageType = 'python' | 'json';
 
 export type VerificationState =
