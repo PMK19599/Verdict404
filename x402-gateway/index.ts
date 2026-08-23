@@ -47,7 +47,13 @@ resourceServer.register(
   new ExactAvmScheme()
 );
 
-const app = new Hono();
+type GatewayEnv = {
+  Variables: {
+    verificationBody: Record<string, unknown>;
+  };
+};
+
+const app = new Hono<GatewayEnv>();
 
 // CORS / browser preflight support.
 // Must run before x402 payment middleware so OPTIONS /verify
@@ -278,7 +284,7 @@ app.use(
 
 app.post("/verify", async (c) => {
   try {
-    const body = await c.req.json();
+    const body = c.get("verificationBody");
 
     const response = await fetch(
       `${verifyServiceUrl}/run-tests`,
