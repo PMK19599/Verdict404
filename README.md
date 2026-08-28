@@ -11,9 +11,9 @@ Verdict404 is an independent, pay-per-use verification layer for autonomous AI a
 
 ## Live Endpoints
 
-*   **Frontend (Interactive Demo):** https://verdict404.vercel.app
-*   **x402 Payment Gateway:** https://verdict404-gateway.onrender.com
-*   **Verification Engine:** https://verdict404-verify.onrender.com
+*   [Frontend Demo](https://verdict404.vercel.app)
+*   [x402 Payment Gateway](https://verdict404-gateway.onrender.com)
+*   [Verification Engine](https://verdict404-verify.onrender.com)
 
 ---
 
@@ -36,6 +36,14 @@ The architecture cleanly separates the paid access gateway from the deterministi
 *   **Frontend:** React + Vite
 *   **x402 Gateway:** Node.js + TypeScript (Express) + `@algorandfoundation/algokit-utils`
 *   **Verification Engine:** Python + FastAPI
+
+### Repository Structure
+```text
+Verdict404/
+├── frontend/       # Interactive demo
+├── x402-gateway/   # Paid verification gateway
+└── verify-service/ # Deterministic verification engine
+```
 
 ---
 
